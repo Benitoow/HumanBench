@@ -289,6 +289,21 @@ def main(argv: list[str] | None = None) -> int:
     parser = build_parser(console)
     args = parser.parse_args(argv)
 
+    if _wizard_needed():
+        try:
+            run_setup_wizard(console, args)
+        except KeyboardInterrupt:
+            console.print()
+            console.print(
+                Panel(
+                    Text("Setup annulé.", style="bold red"),
+                    title="[bold red]Annulé[/bold red]",
+                    border_style="red",
+                    box=box.ROUNDED,
+                )
+            )
+            return 130
+
     try:
         run(args, console)
     except KeyboardInterrupt:
@@ -391,6 +406,250 @@ def print_help(console: Console) -> None:
             box=box.ROUNDED,
         )
     )
+
+
+# ═══════════════════════════════════════════════════════════════════════
+#  SETUP WIZARD
+# ═══════════════════════════════════════════════════════════════════════
+
+
+def _wizard_needed() -> bool:
+    env_path = Path(".env")
+    if not env_path.exists():
+        return True
+    values = dotenv_values(str(env_path))
+    key = (values.get("OPENROUTER_API_KEY") or "").strip()
+    return not key or key == "sk-or-xxxx"
+
+
+def _wizard_menu_table(items: list[tuple[str, str]]) -> Table:
+    t = Table(box=None, show_header=False, padding=(0, 2), expand=False)
+    t.add_column(style="bold green", no_wrap=True)
+    t.add_column(style="white")
+    for num, label in items:
+        t.add_row(num, label)
+    return t
+
+
+def _wizard_pick(console: Console, n: int) -> int:
+    while True:
+        raw = Prompt.ask(f"  [cyan]Choix [bold][1-{n}][/bold][/cyan]", console=console)
+        try:
+            choice = int(raw.strip())
+            if 1 <= choice <= n:
+                return choice - 1
+        except ValueError:
+            pass
+        console.print(f"  [bold red]Entrez un nombre entre 1 et {n}.[/bold red]")
+
+
+def _wizard_input(console: Console, prompt: str, *, secret: bool = False) -> str:
+    while True:
+        val = Prompt.ask(f"  [cyan]{prompt}[/cyan]", password=secret, console=console).strip()
+        if val:
+            return val
+        console.print("  [bold red]Ce champ est requis.[/bold red]")
+
+
+def _wizard_mask(key: str) -> str:
+    return ("*" * 8) + key[-4:] if len(key) >= 4 else "****"
+
+
+def run_setup_wizard(console: Console, args: argparse.Namespace) -> None:
+    S = "bold cyan"
+
+    console.print(render_banner())
+    console.print(
+        Panel(
+            Text.assemble(
+                ("PREMIER LANCEMENT DÉTECTÉ\n\n", "bold green"),
+                (".env absent ou OPENROUTER_API_KEY manquant.\n", "dim white"),
+                ("Ce wizard configure votre environnement en ", "white"),
+                ("30 secondes", "bold cyan"),
+                (" et lance le benchmark immédiatement.", "white"),
+            ),
+            title="[bold green]// SETUP WIZARD[/bold green]",
+            border_style="green",
+            box=box.DOUBLE,
+            padding=(1, 2),
+        )
+    )
+
+    # ── Étape 1 : provider ────────────────────────────────────────────────
+    console.print()
+    console.print(
+        Panel(
+            _wizard_menu_table(
+                [(f"[{i + 1}]", name) for i, (_, name, _, _) in enumerate(_WIZARD_PROVIDERS)]
+            ),
+            title=f"[{S}]ÉTAPE 1 / 5  ·  Provider du modèle testé[/{S}]",
+            border_style="cyan",
+            box=box.ROUNDED,
+            padding=(1, 2),
+        )
+    )
+    provider_idx = _wizard_pick(console, len(_WIZARD_PROVIDERS))
+    provider_id, provider_name, key_env_name, provider_models = _WIZARD_PROVIDERS[provider_idx]
+
+    if provider_id == "custom":
+        key_env_name = _wizard_input(console, "Nom de la variable d'environnement (ex: MY_API_KEY)")
+
+    # ── Étape 2 : clé API provider ────────────────────────────────────────
+    console.print()
+    console.print(
+        Panel(
+            Text(
+                f"Copiez votre clé API {provider_name} depuis votre dashboard.",
+                style="white",
+            ),
+            title=f"[{S}]ÉTAPE 2 / 5  ·  Clé API — {provider_name}[/{S}]",
+            border_style="cyan",
+            box=box.ROUNDED,
+            padding=(1, 2),
+        )
+    )
+    provider_api_key = _wizard_input(console, key_env_name or "API_KEY", secret=True)
+
+    # ── Étape 3 : modèle ──────────────────────────────────────────────────
+    console.print()
+    if provider_models:
+        model_options = provider_models + ["Modèle custom — saisie manuelle"]
+        console.print(
+            Panel(
+                _wizard_menu_table([(f"[{i + 1}]", m) for i, m in enumerate(model_options)]),
+                title=f"[{S}]ÉTAPE 3 / 5  ·  Modèle ({provider_name})[/{S}]",
+                border_style="cyan",
+                box=box.ROUNDED,
+                padding=(1, 2),
+            )
+        )
+        model_idx = _wizard_pick(console, len(model_options))
+        if model_idx == len(model_options) - 1:
+            chosen_model = _wizard_input(console, "Nom du modèle")
+        else:
+            chosen_model = provider_models[model_idx]
+    else:
+        console.print(
+            Panel(
+                Text("Entrez le nom complet du modèle (ex: org/model-name).", style="white"),
+                title=f"[{S}]ÉTAPE 3 / 5  ·  Modèle[/{S}]",
+                border_style="cyan",
+                box=box.ROUNDED,
+                padding=(1, 2),
+            )
+        )
+        chosen_model = _wizard_input(console, "Nom du modèle")
+
+    # ── Étape 4 : clé OpenRouter (juge) ──────────────────────────────────
+    console.print()
+    if provider_id == OPENROUTER_BACKEND:
+        openrouter_key = provider_api_key
+        console.print(
+            Panel(
+                Text(
+                    "OpenRouter est votre provider principal → clé réutilisée pour le juge.",
+                    style="green",
+                ),
+                title=f"[{S}]ÉTAPE 4 / 5  ·  Clé OpenRouter (juge)[/{S}]",
+                border_style="cyan",
+                box=box.ROUNDED,
+                padding=(1, 1),
+            )
+        )
+    else:
+        console.print(
+            Panel(
+                Text.assemble(
+                    ("Le juge est hardcodé sur ", "white"),
+                    ("deepseek/deepseek-v4-pro", "bold cyan"),
+                    (" via OpenRouter.\n", "white"),
+                    ("Créez un compte gratuit sur openrouter.ai si nécessaire.", "white"),
+                ),
+                title=f"[{S}]ÉTAPE 4 / 5  ·  Clé OpenRouter (juge)[/{S}]",
+                border_style="cyan",
+                box=box.ROUNDED,
+                padding=(1, 2),
+            )
+        )
+        openrouter_key = _wizard_input(console, "OPENROUTER_API_KEY", secret=True)
+
+    # ── Étape 5 : récapitulatif + confirmation ────────────────────────────
+    console.print()
+    recap = Table(box=box.SIMPLE, show_header=False, padding=(0, 2))
+    recap.add_column(style="bold cyan", no_wrap=True)
+    recap.add_column(style="white")
+    recap.add_row("Provider", provider_name)
+    recap.add_row("Modèle", chosen_model)
+    recap.add_row(key_env_name or "API_KEY", _wizard_mask(provider_api_key))
+    if provider_id != OPENROUTER_BACKEND:
+        recap.add_row("OPENROUTER_API_KEY", _wizard_mask(openrouter_key))
+
+    console.print(
+        Panel(
+            recap,
+            title="[bold green]ÉTAPE 5 / 5  ·  Récapitulatif[/bold green]",
+            border_style="green",
+            box=box.DOUBLE,
+            padding=(1, 1),
+        )
+    )
+    console.print()
+
+    confirmed = Confirm.ask(
+        "  [cyan]Sauvegarder et lancer le benchmark ?[/cyan]",
+        default=True,
+        console=console,
+    )
+    if not confirmed:
+        console.print()
+        console.print(
+            Panel(
+                Text("Setup annulé. Aucun fichier modifié.", style="bold red"),
+                title="[bold red]Annulé[/bold red]",
+                border_style="red",
+                box=box.ROUNDED,
+            )
+        )
+        raise SystemExit(0)
+
+    # ── Écriture du .env ──────────────────────────────────────────────────
+    env_backend = provider_id if provider_id != "custom" else DEFAULT_PROVIDER
+    lines: list[str] = [
+        f"PROVIDER={env_backend}",
+        f"MODEL_TESTED={chosen_model}",
+        f"OPENROUTER_API_KEY={openrouter_key}",
+    ]
+    if key_env_name and provider_id != OPENROUTER_BACKEND:
+        lines.append(f"{key_env_name}={provider_api_key}")
+
+    Path(".env").write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+    # Propagation dans os.environ (load_dotenv ne peut pas écraser ces valeurs)
+    os.environ["PROVIDER"] = env_backend
+    os.environ["MODEL_TESTED"] = chosen_model
+    os.environ["OPENROUTER_API_KEY"] = openrouter_key
+    if key_env_name:
+        os.environ[key_env_name] = provider_api_key
+
+    # Mettre à jour args si l'utilisateur n'a pas passé de flags CLI
+    if not args.model:
+        args.model = chosen_model
+    if not args.provider and provider_id in SUPPORTED_BACKENDS:
+        args.provider = provider_id
+
+    console.print()
+    console.print(
+        Panel(
+            Text.assemble(
+                (".env sauvegardé  ✓\n\n", "bold green"),
+                ("Lancement du benchmark...", "dim white"),
+            ),
+            border_style="green",
+            box=box.ROUNDED,
+            padding=(0, 2),
+        )
+    )
+    console.print()
 
 
 def run(args: argparse.Namespace, console: Console) -> None:
