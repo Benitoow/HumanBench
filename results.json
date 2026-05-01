@@ -9,5 +9,16 @@
       "ton": 28,
       "interpretation": "Good, with visible AI tics"
     }
+  },
+  {
+    "requested_model": "anthropic/claude-sonnet-4.6",
+    "created_at": "2026-05-01T21:55:49+02:00",
+    "summary": {
+      "score_final": 66,
+      "format": 18,
+      "densite": 23,
+      "ton": 25,
+      "interpretation": "Good, with visible AI tics"
+    }
   }
 ]
