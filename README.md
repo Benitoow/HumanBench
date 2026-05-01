@@ -134,6 +134,36 @@ HumanBench/
 └── .env.example
 ```
 
+## Submit a Result
+
+To submit a benchmark result to the public leaderboard, follow these steps.
+
+### 1. Run the benchmark
+
+```bash
+python run_benchmark.py --model your-org/your-model
+```
+
+The JSON report is saved automatically to `results/`.
+
+### 2. Submit via the website
+
+Open the leaderboard site and click **[ SUBMIT A RUN ]** — either in the header or below the leaderboard table.
+
+Fill in the form:
+
+- **Model name** — the `org/model` identifier used when running the benchmark, e.g. `anthropic/claude-sonnet-4-6`
+- **Provider** — the API backend you used, e.g. `anthropic`, `openrouter`, `deepseek`
+- **Result JSON** — the `.json` file generated in `results/`
+
+Hit submit. You will see: `RUN RECEIVED // PENDING VALIDATION`.
+
+### 3. Validation
+
+Submitted results are reviewed manually before appearing on the leaderboard. Scores are verified against the benchmark protocol to ensure reproducibility and integrity.
+
+> **Site maintainers:** The submission form uses [Formspree](https://formspree.io) to forward results by email. Before the form goes live, replace `YOUR_FORM_ID` in `site/index.html` (the `action` attribute of `#submitForm`) with your actual Formspree form ID. Create a free account at formspree.io, set up a new form with `humanbenchpro@gmail.com` as the notification address, and copy the form ID from the dashboard.
+
 ## Repository safety
 
 HumanBench is open source, but the repository should stay clean:

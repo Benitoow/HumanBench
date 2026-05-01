@@ -410,6 +410,241 @@
   }
   footer .blink-slow { animation: pulse 2s steps(2, end) infinite; color: var(--green-2);}
 
+  /* ================= SUBMIT BUTTON (header top-bar) ================= */
+  .top-bar-right {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+  }
+
+  .submit-run-btn {
+    background: var(--bg);
+    border: 2px solid var(--green-2);
+    color: var(--green);
+    font-family: 'Press Start 2P', monospace;
+    font-size: 8px;
+    letter-spacing: 1px;
+    padding: 6px 10px;
+    cursor: pointer;
+    -webkit-font-smoothing: none;
+    transition: background .1s steps(1, end), color .1s steps(1, end);
+  }
+  .submit-run-btn:hover {
+    background: var(--green-2);
+    color: var(--bg);
+  }
+
+  /* ================= SUBMIT CTA (below legend) ================= */
+  .submit-cta {
+    margin-top: 24px;
+    text-align: center;
+  }
+  .submit-cta-btn {
+    font-family: 'Press Start 2P', monospace;
+    font-size: 10px;
+    letter-spacing: 3px;
+    padding: 16px 32px;
+    background: var(--bg);
+    border: 4px solid var(--green);
+    color: var(--green);
+    cursor: pointer;
+    -webkit-font-smoothing: none;
+    box-shadow:
+      6px 6px 0 var(--dim-2),
+      0 0 24px rgba(0,255,136,.07);
+    transition: background .1s steps(1, end), color .1s steps(1, end);
+  }
+  .submit-cta-btn:hover {
+    background: var(--green);
+    color: var(--bg);
+  }
+
+  /* ================= MODAL OVERLAY ================= */
+  .modal-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 100;
+    background: rgba(3, 10, 3, 0.93);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+  }
+
+  .modal-box {
+    position: relative;
+    width: 560px;
+    max-width: 100%;
+    max-height: calc(100vh - 32px);
+    overflow-y: auto;
+    background: var(--bg-2);
+    border: 4px solid var(--dim);
+    box-shadow:
+      inset 0 0 0 4px var(--bg),
+      inset 0 0 0 8px var(--dim-2),
+      0 0 48px rgba(0,255,136,.08);
+  }
+
+  .modal-box .corner {
+    position: absolute;
+    width: 16px; height: 16px;
+    background: var(--green);
+    z-index: 1;
+  }
+  .modal-box .corner.tl { top: -4px; left: -4px; }
+  .modal-box .corner.tr { top: -4px; right: -4px; }
+  .modal-box .corner.bl { bottom: -4px; left: -4px; }
+  .modal-box .corner.br { bottom: -4px; right: -4px; }
+
+  .modal-top-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 20px;
+    font-size: 8px;
+    color: #4a8a5a;
+    border-bottom: 2px solid var(--dim-2);
+  }
+
+  .modal-close {
+    background: none;
+    border: 2px solid var(--dim);
+    color: #4a8a5a;
+    font-family: 'Press Start 2P', monospace;
+    font-size: 8px;
+    padding: 4px 8px;
+    cursor: pointer;
+    letter-spacing: 1px;
+    -webkit-font-smoothing: none;
+    transition: border-color .1s steps(1, end), color .1s steps(1, end);
+  }
+  .modal-close:hover {
+    border-color: var(--orange);
+    color: var(--orange);
+  }
+
+  .modal-body {
+    padding: 24px 28px 28px;
+  }
+
+  .modal-section-title {
+    font-size: 9px;
+    color: #4a8a5a;
+    letter-spacing: 3px;
+    margin-bottom: 24px;
+  }
+
+  .field-group {
+    margin-bottom: 20px;
+  }
+
+  .field-label {
+    display: block;
+    font-size: 7px;
+    color: #4a8a5a;
+    letter-spacing: 2px;
+    margin-bottom: 8px;
+  }
+
+  .field-input {
+    display: block;
+    width: 100%;
+    background: var(--bg);
+    border: 2px solid var(--dim);
+    color: var(--green);
+    font-family: 'Press Start 2P', monospace;
+    font-size: 9px;
+    padding: 10px 12px;
+    letter-spacing: 1px;
+    outline: none;
+    -webkit-font-smoothing: none;
+    transition: border-color .1s steps(1, end);
+  }
+  .field-input:focus {
+    border-color: var(--green-2);
+  }
+  .field-input::placeholder {
+    color: var(--dim);
+  }
+
+  .file-drop-label {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: var(--bg);
+    border: 2px solid var(--dim);
+    color: var(--green-2);
+    font-family: 'Press Start 2P', monospace;
+    font-size: 8px;
+    padding: 10px 12px;
+    cursor: pointer;
+    letter-spacing: 1px;
+    -webkit-font-smoothing: none;
+    transition: border-color .1s steps(1, end);
+  }
+  .file-drop-label:hover {
+    border-color: var(--green-2);
+  }
+  .file-drop-label .file-icon {
+    color: var(--lime);
+    flex-shrink: 0;
+  }
+  .file-input-hidden {
+    display: none;
+  }
+
+  .submit-form-btn {
+    display: block;
+    width: 100%;
+    margin-top: 8px;
+    background: var(--bg);
+    border: 2px solid var(--green);
+    color: var(--green);
+    font-family: 'Press Start 2P', monospace;
+    font-size: 9px;
+    letter-spacing: 2px;
+    padding: 14px;
+    cursor: pointer;
+    -webkit-font-smoothing: none;
+    box-shadow: 4px 4px 0 var(--dim-2);
+    transition: background .1s steps(1, end), color .1s steps(1, end);
+  }
+  .submit-form-btn:hover:not(:disabled) {
+    background: var(--green);
+    color: var(--bg);
+  }
+  .submit-form-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  /* ---- Confirmation screen ---- */
+  .modal-confirm {
+    padding: 40px 28px 36px;
+    text-align: center;
+  }
+  .confirm-icon {
+    display: block;
+    font-size: 28px;
+    color: var(--gold);
+    text-shadow: 2px 2px 0 #3a2a00;
+    animation: twinkle 2s steps(2, end) infinite;
+    margin-bottom: 24px;
+  }
+  .confirm-msg {
+    font-size: 13px;
+    color: var(--green);
+    letter-spacing: 3px;
+    margin-bottom: 12px;
+    text-shadow: 0 0 12px rgba(0,255,136,.45);
+  }
+  .confirm-sub {
+    font-size: 9px;
+    color: #4a8a5a;
+    letter-spacing: 3px;
+    margin-bottom: 32px;
+  }
+
   @media (max-width: 760px) {
     body {
       font-size: 10px;
@@ -510,6 +745,33 @@
       gap: 12px;
     }
   }
+  @media (max-width: 760px) {
+    .top-bar-right {
+      gap: 6px;
+    }
+    .submit-run-btn {
+      font-size: 7px;
+      padding: 4px 7px;
+    }
+    .submit-cta-btn {
+      font-size: 8px;
+      padding: 14px 20px;
+      letter-spacing: 2px;
+    }
+    .modal-body {
+      padding: 16px 14px 18px;
+    }
+    .modal-confirm {
+      padding: 28px 16px 24px;
+    }
+    .confirm-msg {
+      font-size: 10px;
+      letter-spacing: 2px;
+    }
+    .field-input {
+      font-size: 8px;
+    }
+  }
 </style>
 </head>
 <body>
@@ -528,7 +790,10 @@
 
     <div class="top-bar">
       <span><span class="dot"></span>SYS//ONLINE</span>
-      <span class="badge">LEADERBOARD v0.1</span>
+      <span class="top-bar-right">
+        <span class="badge">LEADERBOARD v0.1</span>
+        <button class="submit-run-btn" id="openSubmitHeader" type="button">[ SUBMIT A RUN ]</button>
+      </span>
     </div>
 
     <h1 class="title">HUMANBENCH<span class="cursor"></span></h1>
@@ -582,12 +847,69 @@
     </div>
   </div>
 
+  <div class="submit-cta">
+    <button class="submit-cta-btn" id="openSubmitCta" type="button">[ SUBMIT A RUN ]</button>
+  </div>
+
   <footer>
     <span class="blink-slow">▮</span> &nbsp; HUMANBENCH // OPEN EVAL CONSORTIUM // <span class="blink-slow">▮</span>
     <br><br>
     PRESS [ANY KEY] TO CONTINUE
   </footer>
 
+</div>
+
+<!-- ==================== SUBMIT MODAL ==================== -->
+<div class="modal-overlay" id="submitOverlay" style="display:none">
+  <div class="modal-box">
+    <span class="corner tl"></span>
+    <span class="corner tr"></span>
+    <span class="corner bl"></span>
+    <span class="corner br"></span>
+
+    <div class="modal-top-bar">
+      <span><span class="dot"></span>SUBMIT A RUN</span>
+      <button class="modal-close" id="modalClose" type="button">[ ✕ ]</button>
+    </div>
+
+    <div class="modal-body" id="modalBody">
+      <div class="modal-section-title">// UPLOAD YOUR RESULT</div>
+
+      <form id="submitForm" action="https://formspree.io/f/xojrqobw" method="POST" enctype="multipart/form-data">
+        <input type="hidden" name="_subject" value="HumanBench — New Run Submission">
+
+        <div class="field-group">
+          <label class="field-label" for="modelName">MODEL NAME</label>
+          <input class="field-input" type="text" id="modelName" name="model"
+            placeholder="anthropic/claude-sonnet-4-6" required autocomplete="off" spellcheck="false">
+        </div>
+
+        <div class="field-group">
+          <label class="field-label" for="providerName">PROVIDER</label>
+          <input class="field-input" type="text" id="providerName" name="provider"
+            placeholder="anthropic" required autocomplete="off" spellcheck="false">
+        </div>
+
+        <div class="field-group">
+          <label class="field-label" for="jsonFile">RESULT JSON</label>
+          <label class="file-drop-label" for="jsonFile">
+            <span class="file-icon">▶</span>
+            <span id="fileName">SELECT FILE</span>
+          </label>
+          <input class="file-input-hidden" type="file" id="jsonFile" name="attachment" accept=".json" required>
+        </div>
+
+        <button type="submit" class="submit-form-btn">SUBMIT RUN ▶</button>
+      </form>
+    </div>
+
+    <div class="modal-confirm" id="modalConfirm" style="display:none">
+      <span class="confirm-icon">✦</span>
+      <div class="confirm-msg">RUN RECEIVED</div>
+      <div class="confirm-sub">// PENDING VALIDATION</div>
+      <button class="submit-form-btn" id="confirmClose" type="button">[ CLOSE ]</button>
+    </div>
+  </div>
 </div>
 
 <script>
@@ -846,6 +1168,93 @@ function spawnFireflies() {
   });
 }
 spawnFireflies();
+
+/* =================================================================
+   SUBMIT MODAL
+   ================================================================= */
+(function () {
+  const overlay    = document.getElementById('submitOverlay');
+  const modalBody  = document.getElementById('modalBody');
+  const modalConf  = document.getElementById('modalConfirm');
+  const fileInput  = document.getElementById('jsonFile');
+  const fileNameEl = document.getElementById('fileName');
+  const submitForm = document.getElementById('submitForm');
+
+  function openModal() {
+    overlay.style.display = 'flex';
+    modalBody.style.display = 'block';
+    modalConf.style.display = 'none';
+    submitForm.reset();
+    fileNameEl.textContent = 'SELECT FILE';
+    document.body.style.overflow = 'hidden';
+  }
+
+  function closeModal() {
+    overlay.style.display = 'none';
+    document.body.style.overflow = '';
+  }
+
+  ['openSubmitHeader', 'openSubmitCta'].forEach(function (id) {
+    var el = document.getElementById(id);
+    if (el) el.addEventListener('click', openModal);
+  });
+
+  document.getElementById('modalClose').addEventListener('click', closeModal);
+  document.getElementById('confirmClose').addEventListener('click', closeModal);
+
+  overlay.addEventListener('click', function (e) {
+    if (e.target === overlay) closeModal();
+  });
+
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') closeModal();
+  });
+
+  fileInput.addEventListener('change', function () {
+    var f = fileInput.files[0];
+    fileNameEl.textContent = f ? f.name.toUpperCase() : 'SELECT FILE';
+  });
+
+  submitForm.addEventListener('submit', async function (e) {
+    e.preventDefault();
+    var btn = submitForm.querySelector('.submit-form-btn');
+    var origText = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = 'TRANSMITTING...';
+
+    try {
+      var file = fileInput.files[0];
+      if (!file) throw new Error('NO FILE SELECTED');
+
+      /* validate JSON client-side before sending */
+      var text = await file.text();
+      JSON.parse(text);
+
+      var data = new FormData(submitForm);
+
+      var res = await fetch(submitForm.action, {
+        method: 'POST',
+        body: data,
+        headers: { 'Accept': 'application/json' },
+      });
+
+      var resJson = await res.json().catch(function () { return {}; });
+      if (!res.ok) throw new Error(resJson.error || ('HTTP ' + res.status));
+
+      modalBody.style.display = 'none';
+      modalConf.style.display = 'block';
+    } catch (err) {
+      var msg = (err instanceof SyntaxError)
+        ? 'INVALID JSON'
+        : err.message.slice(0, 22).toUpperCase();
+      btn.textContent = msg;
+      setTimeout(function () {
+        btn.disabled = false;
+        btn.textContent = origText;
+      }, 3000);
+    }
+  });
+})();
 </script>
 </body>
 </html>
