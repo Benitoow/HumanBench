@@ -41,52 +41,57 @@ python -m venv .venv
 # source .venv/bin/activate   # macOS / Linux
 ```
 
-**2 — Install dependencies**
+**2 — Install the package**
 
 ```bash
-pip install -r requirements.txt
+pip install -e .
 ```
 
-**3 — Set up environment**
+This installs all dependencies and registers the `humanbench` command globally in your environment.
+
+**3 — Configure your API keys**
 
 ```bash
-copy .env.example .env   # Windows
-# cp .env.example .env   # macOS / Linux
+humanbench config
 ```
 
-Edit `.env` and fill in the providers you plan to use:
-
-```env
-PROVIDER=auto
-MODEL_TESTED=anthropic/claude-sonnet-4-6
-OPENROUTER_API_KEY=sk-or-xxxx
-DEEPSEEK_API_KEY=sk-xxxx
-ANTHROPIC_API_KEY=sk-ant-xxxx
-OPENAI_API_KEY=sk-xxxx
-MISTRAL_API_KEY=xxxx
-GOOGLE_API_KEY=xxxx
-```
+An interactive wizard will walk you through picking a provider, entering your API key, and selecting a model. The wizard runs automatically on first launch if `.env` is missing or empty — but you can re-run it any time to change your setup.
 
 ---
 
 ## Running a benchmark
 
 ```bash
-python run_benchmark.py --model anthropic/claude-sonnet-4-6
+humanbench run anthropic/claude-sonnet-4-6
 ```
 
 Other examples:
 
 ```bash
-python run_benchmark.py --model openai/gpt-4.1 --verbose
-python run_benchmark.py --model mistralai/mistral-large --prompts prompts.json --output results/mistral.json
-python run_benchmark.py --model xiaomi/mimo-v2-flash
-python run_benchmark.py --provider deepseek --model deepseek-v4-flash
-python run_benchmark.py --provider anthropic --model claude-sonnet-4-5
-python run_benchmark.py --provider google --model gemini-2.5-flash
+humanbench run openai/gpt-4.1 --verbose
+humanbench run mistralai/mistral-large --prompts prompts.json --output results/mistral.json
+humanbench run --provider deepseek --model deepseek-v4-flash
+humanbench run --provider google --model gemini-2.5-flash
 ```
 
 The JSON report is written to `results/` by default.
+
+---
+
+## Commands
+
+| Command | Description |
+|---------|-------------|
+| `humanbench run [model]` | Run the benchmark on the specified model |
+| `humanbench config` | Re-run the interactive setup wizard |
+| `humanbench --help` | Top-level help |
+| `humanbench run --help` | Options for the run command |
+
+`--model` is also accepted as a flag for backwards compatibility:
+
+```bash
+humanbench run --model anthropic/claude-sonnet-4-6
+```
 
 ---
 
@@ -95,15 +100,11 @@ The JSON report is written to `results/` by default.
 | Backend | Key in `.env` | Notes |
 |---------|--------------|-------|
 | `openrouter` | `OPENROUTER_API_KEY` | Routes to any provider |
-| `deepseek` | `DEEPSEEK_API_KEY` | Native DeepSeek API |
 | `anthropic` | `ANTHROPIC_API_KEY` | Native Anthropic API |
 | `openai` | `OPENAI_API_KEY` | Native OpenAI API |
 | `mistral` | `MISTRAL_API_KEY` | Native Mistral API |
 | `google` | `GOOGLE_API_KEY` | Native Gemini API |
-
-Set the active backend with `PROVIDER=` in `.env`.
-
-> **Judge** — hardcoded to `deepseek/deepseek-v4-pro` via OpenRouter, fallbacks disabled, `xhigh` reasoning. This is intentional. Swapping judges between runs makes scores incomparable.
+| `deepseek` | `DEEPSEEK_API_KEY` | Native DeepSeek API |
 
 ---
 
@@ -128,7 +129,7 @@ To get your result on the public leaderboard:
 **1 — Run the benchmark**
 
 ```bash
-python run_benchmark.py --model your-org/your-model
+humanbench run your-org/your-model
 ```
 
 **2 — Submit via the site**
@@ -151,12 +152,16 @@ Results are reviewed manually before appearing on the leaderboard. Scores are ve
 
 ```
 HumanBench/
+├── humanbench/          # installable package
+│   ├── __init__.py
+│   └── cli.py           # humanbench command entry point
 ├── adapters/            # provider-specific model adapters
 ├── judge/               # judge prompt and scoring support
 ├── site/                # leaderboard website
 ├── prompts.json         # benchmark prompt set
 ├── results/             # generated reports (gitignored)
-├── run_benchmark.py     # CLI entrypoint
+├── run_benchmark.py     # legacy shim (delegates to humanbench.cli)
+├── pyproject.toml
 ├── SCORING_FRAMEWORK.md
 ├── requirements.txt
 └── .env.example
