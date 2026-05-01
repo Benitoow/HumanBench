@@ -772,9 +772,118 @@
       font-size: 8px;
     }
   }
+
+  /* ================= CRT / VHS OVERLAY ================= */
+
+  /* Scanlines */
+  .crt-scanlines {
+    position: fixed;
+    inset: 0;
+    z-index: 9998;
+    pointer-events: none;
+    background: repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 2px,
+      rgba(0, 0, 0, 0.13) 2px,
+      rgba(0, 0, 0, 0.13) 4px
+    );
+  }
+
+  /* Screen curvature vignette — simulates the curved tube edges */
+  .crt-curve {
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    pointer-events: none;
+    border-radius: 0 !important;
+    /* radial vignette darkens corners like a curved phosphor tube */
+    background: radial-gradient(
+      ellipse at center,
+      transparent 60%,
+      rgba(0, 0, 0, 0.45) 100%
+    );
+  }
+
+  /* Inner phosphor bloom — subtle green glow at center */
+  .crt-curve::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(
+      ellipse at center,
+      rgba(0, 255, 100, 0.025) 0%,
+      transparent 65%
+    );
+  }
+
+  /* Screen edge curvature illusion using box-shadow on a pseudo-element */
+  .crt-curve::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    box-shadow:
+      inset 0   0   80px 20px rgba(0, 0, 0, 0.6),   /* overall edge darkening */
+      inset 0   0   20px 4px  rgba(0, 0, 0, 0.4),   /* hard inner ring */
+      inset 80px  0   40px -40px rgba(0, 0, 0, 0.35), /* left curve */
+      inset -80px 0   40px -40px rgba(0, 0, 0, 0.35); /* right curve */
+  }
+
+  /* Horizontal roll / flicker line — VHS tape artifact */
+  .crt-flicker {
+    position: fixed;
+    left: 0;
+    right: 0;
+    height: 3px;
+    z-index: 9997;
+    pointer-events: none;
+    background: rgba(0, 255, 120, 0.04);
+    animation: crt-roll 8s linear infinite;
+    opacity: 0;
+  }
+  @keyframes crt-roll {
+    0%   { top: -4px;   opacity: 0; }
+    2%   { opacity: 1; }
+    98%  { opacity: 0.6; }
+    100% { top: 100vh;  opacity: 0; }
+  }
+
+  /* Intermittent static burst */
+  .crt-static {
+    position: fixed;
+    inset: 0;
+    z-index: 9996;
+    pointer-events: none;
+    opacity: 0;
+    animation: crt-static 12s steps(1, end) infinite;
+    background: repeating-linear-gradient(
+      90deg,
+      rgba(0,255,80,0.03) 0 1px,
+      transparent 1px 3px
+    );
+  }
+  @keyframes crt-static {
+    0%    { opacity: 0; }
+    /* small glitch hit ~4 s in */
+    33%   { opacity: 0; }
+    33.5% { opacity: 1; }
+    34%   { opacity: 0; }
+    /* bigger hit ~9 s in */
+    75%   { opacity: 0; }
+    75.3% { opacity: 0.7; }
+    75.6% { opacity: 0.2; }
+    76%   { opacity: 0; }
+    100%  { opacity: 0; }
+  }
 </style>
 </head>
 <body>
+
+<!-- CRT / VHS overlay layers -->
+<div class="crt-scanlines"></div>
+<div class="crt-curve"></div>
+<div class="crt-flicker"></div>
+<div class="crt-static"></div>
 
 <!-- pixel forest silhouettes -->
 <div class="forest" id="forest"></div>

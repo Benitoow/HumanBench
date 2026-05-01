@@ -30,5 +30,16 @@
       "ton": 28,
       "interpretation": "Good, with visible AI tics"
     }
+  },
+  {
+    "requested_model": "anthropic/claude-opus-4.7",
+    "created_at": "2026-05-01T20:01:18+02:00",
+    "summary": {
+      "score_final": 76,
+      "format": 22,
+      "densite": 25,
+      "ton": 28,
+      "interpretation": "Good, with visible AI tics"
+    }
   }
 ]
