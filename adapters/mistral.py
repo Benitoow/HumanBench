@@ -17,7 +17,7 @@ class MistralError(AdapterError):
 class MistralAdapter(ModelAdapter):
     def __init__(self, api_key: str, *, timeout: float = 90.0) -> None:
         if not api_key:
-            raise MistralError("MISTRAL_API_KEY est manquante.")
+            raise MistralError("MISTRAL_API_KEY is missing.")
 
         self._client = httpx.Client(
             timeout=timeout,
@@ -63,15 +63,15 @@ class MistralAdapter(ModelAdapter):
             data = response.json()
         except httpx.HTTPStatusError as exc:
             detail = _short_response_text(exc.response)
-            raise MistralError(f"Mistral a refuse la requete ({exc.response.status_code}). {detail}") from exc
+            raise MistralError(f"Mistral rejected the request ({exc.response.status_code}). {detail}") from exc
         except httpx.HTTPError as exc:
-            raise MistralError(f"Erreur reseau Mistral: {exc}") from exc
+            raise MistralError(f"Mistral network error: {exc}") from exc
         except ValueError as exc:
-            raise MistralError("Mistral a renvoye une reponse non JSON.") from exc
+            raise MistralError("Mistral returned a non-JSON response.") from exc
 
         choices = data.get("choices") or []
         if not choices:
-            raise MistralError(f"Mistral n'a renvoye aucun choix. {_response_debug_summary(data, model)}")
+            raise MistralError(f"Mistral returned no choices. {_response_debug_summary(data, model)}")
 
         choice = choices[0]
         message = choice.get("message") or {}
@@ -79,7 +79,7 @@ class MistralAdapter(ModelAdapter):
         if not content:
             if allow_empty:
                 return Generation("", str(data.get("model") or model), data, data.get("usage"))
-            raise MistralError(f"Mistral a renvoye une reponse vide. {_choice_debug_summary(choice, data, model)}")
+            raise MistralError(f"Mistral returned an empty response. {_choice_debug_summary(choice, data, model)}")
 
         return Generation(content.strip(), str(data.get("model") or model), data, data.get("usage"))
 
@@ -108,7 +108,7 @@ def _short_response_text(response: httpx.Response) -> str:
 def _choice_debug_summary(choice: dict[str, Any], data: dict[str, Any], requested_model: str) -> str:
     usage = data.get("usage") or {}
     return (
-        f"(modele_demande={requested_model}; modele_recu={data.get('model')}; "
+        f"(requested_model={requested_model}; returned_model={data.get('model')}; "
         f"finish_reason={choice.get('finish_reason')}; completion_tokens={usage.get('completion_tokens')})"
     )
 
@@ -116,6 +116,6 @@ def _choice_debug_summary(choice: dict[str, Any], data: dict[str, Any], requeste
 def _response_debug_summary(data: dict[str, Any], requested_model: str) -> str:
     usage = data.get("usage") or {}
     return (
-        f"(modele_demande={requested_model}; modele_recu={data.get('model')}; "
+        f"(requested_model={requested_model}; returned_model={data.get('model')}; "
         f"completion_tokens={usage.get('completion_tokens')})"
     )

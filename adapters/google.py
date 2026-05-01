@@ -18,7 +18,7 @@ class GoogleError(AdapterError):
 class GoogleAdapter(ModelAdapter):
     def __init__(self, api_key: str, *, timeout: float = 90.0) -> None:
         if not api_key:
-            raise GoogleError("GOOGLE_API_KEY ou GEMINI_API_KEY est manquante.")
+            raise GoogleError("GOOGLE_API_KEY or GEMINI_API_KEY is missing.")
 
         self._api_key = api_key
         self._client = httpx.Client(timeout=timeout, headers={"Content-Type": "application/json"})
@@ -64,17 +64,17 @@ class GoogleAdapter(ModelAdapter):
             data = response.json()
         except httpx.HTTPStatusError as exc:
             detail = _short_response_text(exc.response)
-            raise GoogleError(f"Google Gemini a refuse la requete ({exc.response.status_code}). {detail}") from exc
+            raise GoogleError(f"Google Gemini rejected the request ({exc.response.status_code}). {detail}") from exc
         except httpx.HTTPError as exc:
-            raise GoogleError(f"Erreur reseau Google Gemini: {exc}") from exc
+            raise GoogleError(f"Google Gemini network error: {exc}") from exc
         except ValueError as exc:
-            raise GoogleError("Google Gemini a renvoye une reponse non JSON.") from exc
+            raise GoogleError("Google Gemini returned a non-JSON response.") from exc
 
         content = _extract_text(data)
         if not content:
             if allow_empty:
                 return Generation("", model, data, data.get("usageMetadata"))
-            raise GoogleError(f"Google Gemini a renvoye une reponse vide. {_response_debug_summary(data, model)}")
+            raise GoogleError(f"Google Gemini returned an empty response. {_response_debug_summary(data, model)}")
 
         return Generation(content.strip(), model, data, data.get("usageMetadata"))
 
@@ -129,6 +129,6 @@ def _response_debug_summary(data: dict[str, Any], requested_model: str) -> str:
     candidates = data.get("candidates") or []
     finish_reason = candidates[0].get("finishReason") if candidates else None
     return (
-        f"(modele_demande={requested_model}; finish_reason={finish_reason}; "
+        f"(requested_model={requested_model}; finish_reason={finish_reason}; "
         f"candidates={len(candidates)}; output_tokens={usage.get('candidatesTokenCount')})"
     )

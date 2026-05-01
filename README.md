@@ -60,7 +60,6 @@ Example:
 
 ```env
 PROVIDER=auto
-JUDGE_PROVIDER=auto
 MODEL_TESTED=anthropic/claude-sonnet-4-6
 OPENROUTER_API_KEY=sk-or-xxxx
 DEEPSEEK_API_KEY=sk-xxxx
@@ -68,12 +67,6 @@ ANTHROPIC_API_KEY=sk-ant-xxxx
 OPENAI_API_KEY=sk-xxxx
 MISTRAL_API_KEY=xxxx
 GOOGLE_API_KEY=xxxx
-MODEL_JUDGE=deepseek/deepseek-v4-pro
-JUDGE_REASONING_EFFORT=xhigh
-JUDGE_REASONING_EXCLUDE=true
-JUDGE_PROVIDER_ORDER=deepseek
-JUDGE_ALLOW_FALLBACKS=false
-JUDGE_MAX_TOKENS=8192
 ```
 
 ## Run a benchmark
@@ -85,12 +78,12 @@ python run_benchmark.py --model anthropic/claude-sonnet-4-6
 Useful variations:
 
 ```bash
-python run_benchmark.py --model openai/gpt-4.1 --judge deepseek/deepseek-v4-pro --verbose
+python run_benchmark.py --model openai/gpt-4.1 --verbose
 python run_benchmark.py --model mistralai/mistral-large --prompts prompts.json --output results/mistral.json
-python run_benchmark.py --model xiaomi/mimo-v2-flash --judge deepseek/deepseek-v4-pro --judge-effort xhigh --judge-provider-order deepseek
-python run_benchmark.py --provider deepseek --model deepseek-v4-flash --judge deepseek-v4-pro
-python run_benchmark.py --provider anthropic --model claude-sonnet-4-5 --judge-provider openrouter --judge deepseek/deepseek-v4-pro
-python run_benchmark.py --provider google --model gemini-2.5-flash --judge-provider openrouter --judge deepseek/deepseek-v4-pro
+python run_benchmark.py --model xiaomi/mimo-v2-flash
+python run_benchmark.py --provider deepseek --model deepseek-v4-flash
+python run_benchmark.py --provider anthropic --model claude-sonnet-4-5
+python run_benchmark.py --provider google --model gemini-2.5-flash
 ```
 
 By default, the JSON report is written to `results/`.
@@ -108,9 +101,9 @@ Supported backends:
 - `mistral`
 - `google`
 
-The tested model and the judge can use different providers through `PROVIDER` and `JUDGE_PROVIDER`.
+The tested model provider is configured through `PROVIDER`.
 
-For `deepseek/deepseek-v4-pro` on OpenRouter, HumanBench defaults to the official `deepseek` provider, disables fallbacks, requests strict parameter support, and uses `xhigh` reasoning effort.
+The judge is intentionally hardcoded in `run_benchmark.py` to `deepseek/deepseek-v4-pro` through OpenRouter, routed to the official `deepseek` provider with fallbacks disabled and `xhigh` reasoning. Changing the judge from run to run would turn the benchmark into confetti with a CLI.
 
 If you use DeepSeek directly, set `PROVIDER=deepseek` with `DEEPSEEK_API_KEY` and a native model such as `deepseek-v4-pro` or `deepseek-v4-flash`.
 
@@ -119,7 +112,7 @@ If you use DeepSeek directly, set `PROVIDER=deepseek` with `DEEPSEEK_API_KEY` an
 Each run produces a JSON summary containing:
 
 - prompt metadata
-- model and judge configuration
+- tested model and fixed judge configuration
 - per-prompt scores
 - final aggregate score
 - report timestamp

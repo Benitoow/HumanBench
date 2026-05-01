@@ -28,7 +28,7 @@ class OpenRouterAdapter(ModelAdapter):
         app_url: str | None = None,
     ) -> None:
         if not api_key:
-            raise OpenRouterError("OPENROUTER_API_KEY est manquante.")
+            raise OpenRouterError("OPENROUTER_API_KEY is missing.")
 
         headers = {
             "Authorization": f"Bearer {api_key}",
@@ -82,23 +82,23 @@ class OpenRouterAdapter(ModelAdapter):
         except httpx.HTTPStatusError as exc:
             detail = _short_response_text(exc.response)
             raise OpenRouterError(
-                f"OpenRouter a refuse la requete ({exc.response.status_code}). {detail}"
+                f"OpenRouter rejected the request ({exc.response.status_code}). {detail}"
             ) from exc
         except httpx.HTTPError as exc:
-            raise OpenRouterError(f"Erreur reseau OpenRouter: {exc}") from exc
+            raise OpenRouterError(f"OpenRouter network error: {exc}") from exc
         except ValueError as exc:
-            raise OpenRouterError("OpenRouter a renvoye une reponse non JSON.") from exc
+            raise OpenRouterError("OpenRouter returned a non-JSON response.") from exc
 
         choices = data.get("choices") or []
         if not choices:
             raise OpenRouterError(
-                f"OpenRouter n'a renvoye aucun choix. {_response_debug_summary(data, model)}"
+                f"OpenRouter returned no choices. {_response_debug_summary(data, model)}"
             )
 
         choice = choices[0]
         if choice.get("error"):
             raise OpenRouterError(
-                f"OpenRouter a renvoye une erreur de choix. {_choice_debug_summary(choice, data, model)}"
+                f"OpenRouter returned a choice error. {_choice_debug_summary(choice, data, model)}"
             )
 
         message = choice.get("message") or {}
@@ -112,7 +112,7 @@ class OpenRouterAdapter(ModelAdapter):
                     usage=data.get("usage"),
                 )
             raise EmptyGenerationError(
-                f"OpenRouter a renvoye une reponse vide. {_choice_debug_summary(choice, data, model)}"
+                f"OpenRouter returned an empty response. {_choice_debug_summary(choice, data, model)}"
             )
 
         return Generation(
@@ -153,8 +153,8 @@ def _choice_debug_summary(choice: dict[str, Any], data: dict[str, Any], requeste
     usage = data.get("usage") or {}
     choice_error = choice.get("error") or {}
     bits = [
-        f"modele_demande={requested_model}",
-        f"modele_recu={data.get('model')}",
+        f"requested_model={requested_model}",
+        f"returned_model={data.get('model')}",
         f"finish_reason={choice.get('finish_reason')}",
         f"native_finish_reason={choice.get('native_finish_reason')}",
         f"completion_tokens={usage.get('completion_tokens')}",
@@ -162,7 +162,7 @@ def _choice_debug_summary(choice: dict[str, Any], data: dict[str, Any], requeste
     if choice_error:
         bits.append(f"choice_error={choice_error}")
     if isinstance(message, dict):
-        visible_keys = ", ".join(sorted(str(key) for key in message.keys())) or "aucune"
+        visible_keys = ", ".join(sorted(str(key) for key in message.keys())) or "none"
         bits.append(f"message_keys={visible_keys}")
     return "(" + "; ".join(bits) + ")"
 
@@ -170,6 +170,6 @@ def _choice_debug_summary(choice: dict[str, Any], data: dict[str, Any], requeste
 def _response_debug_summary(data: dict[str, Any], requested_model: str) -> str:
     usage = data.get("usage") or {}
     return (
-        f"(modele_demande={requested_model}; modele_recu={data.get('model')}; "
+        f"(requested_model={requested_model}; returned_model={data.get('model')}; "
         f"completion_tokens={usage.get('completion_tokens')})"
     )

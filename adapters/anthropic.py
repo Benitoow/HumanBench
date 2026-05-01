@@ -18,7 +18,7 @@ class AnthropicError(AdapterError):
 class AnthropicAdapter(ModelAdapter):
     def __init__(self, api_key: str, *, timeout: float = 90.0) -> None:
         if not api_key:
-            raise AnthropicError("ANTHROPIC_API_KEY est manquante.")
+            raise AnthropicError("ANTHROPIC_API_KEY is missing.")
 
         self._client = httpx.Client(
             timeout=timeout,
@@ -66,17 +66,17 @@ class AnthropicAdapter(ModelAdapter):
             data = response.json()
         except httpx.HTTPStatusError as exc:
             detail = _short_response_text(exc.response)
-            raise AnthropicError(f"Anthropic a refuse la requete ({exc.response.status_code}). {detail}") from exc
+            raise AnthropicError(f"Anthropic rejected the request ({exc.response.status_code}). {detail}") from exc
         except httpx.HTTPError as exc:
-            raise AnthropicError(f"Erreur reseau Anthropic: {exc}") from exc
+            raise AnthropicError(f"Anthropic network error: {exc}") from exc
         except ValueError as exc:
-            raise AnthropicError("Anthropic a renvoye une reponse non JSON.") from exc
+            raise AnthropicError("Anthropic returned a non-JSON response.") from exc
 
         content = _normalize_content(data.get("content"))
         if not content:
             if allow_empty:
                 return Generation("", str(data.get("model") or model), data, data.get("usage"))
-            raise AnthropicError(f"Anthropic a renvoye une reponse vide. {_response_debug_summary(data, model)}")
+            raise AnthropicError(f"Anthropic returned an empty response. {_response_debug_summary(data, model)}")
 
         return Generation(content.strip(), str(data.get("model") or model), data, data.get("usage"))
 
@@ -123,6 +123,6 @@ def _short_response_text(response: httpx.Response) -> str:
 def _response_debug_summary(data: dict[str, Any], requested_model: str) -> str:
     usage = data.get("usage") or {}
     return (
-        f"(modele_demande={requested_model}; modele_recu={data.get('model')}; "
+        f"(requested_model={requested_model}; returned_model={data.get('model')}; "
         f"stop_reason={data.get('stop_reason')}; output_tokens={usage.get('output_tokens')})"
     )

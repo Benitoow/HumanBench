@@ -17,7 +17,7 @@ class OpenAIError(AdapterError):
 class OpenAIAdapter(ModelAdapter):
     def __init__(self, api_key: str, *, timeout: float = 90.0) -> None:
         if not api_key:
-            raise OpenAIError("OPENAI_API_KEY est manquante.")
+            raise OpenAIError("OPENAI_API_KEY is missing.")
 
         self._client = httpx.Client(
             timeout=timeout,
@@ -67,15 +67,15 @@ class OpenAIAdapter(ModelAdapter):
             data = response.json()
         except httpx.HTTPStatusError as exc:
             detail = _short_response_text(exc.response)
-            raise OpenAIError(f"OpenAI a refuse la requete ({exc.response.status_code}). {detail}") from exc
+            raise OpenAIError(f"OpenAI rejected the request ({exc.response.status_code}). {detail}") from exc
         except httpx.HTTPError as exc:
-            raise OpenAIError(f"Erreur reseau OpenAI: {exc}") from exc
+            raise OpenAIError(f"OpenAI network error: {exc}") from exc
         except ValueError as exc:
-            raise OpenAIError("OpenAI a renvoye une reponse non JSON.") from exc
+            raise OpenAIError("OpenAI returned a non-JSON response.") from exc
 
         choices = data.get("choices") or []
         if not choices:
-            raise OpenAIError(f"OpenAI n'a renvoye aucun choix. {_response_debug_summary(data, model)}")
+            raise OpenAIError(f"OpenAI returned no choices. {_response_debug_summary(data, model)}")
 
         choice = choices[0]
         message = choice.get("message") or {}
@@ -83,7 +83,7 @@ class OpenAIAdapter(ModelAdapter):
         if not content:
             if allow_empty:
                 return Generation("", str(data.get("model") or model), data, data.get("usage"))
-            raise OpenAIError(f"OpenAI a renvoye une reponse vide. {_choice_debug_summary(choice, data, model)}")
+            raise OpenAIError(f"OpenAI returned an empty response. {_choice_debug_summary(choice, data, model)}")
 
         return Generation(content.strip(), str(data.get("model") or model), data, data.get("usage"))
 
@@ -119,7 +119,7 @@ def _short_response_text(response: httpx.Response) -> str:
 def _choice_debug_summary(choice: dict[str, Any], data: dict[str, Any], requested_model: str) -> str:
     usage = data.get("usage") or {}
     return (
-        f"(modele_demande={requested_model}; modele_recu={data.get('model')}; "
+        f"(requested_model={requested_model}; returned_model={data.get('model')}; "
         f"finish_reason={choice.get('finish_reason')}; completion_tokens={usage.get('completion_tokens')})"
     )
 
@@ -127,6 +127,6 @@ def _choice_debug_summary(choice: dict[str, Any], data: dict[str, Any], requeste
 def _response_debug_summary(data: dict[str, Any], requested_model: str) -> str:
     usage = data.get("usage") or {}
     return (
-        f"(modele_demande={requested_model}; modele_recu={data.get('model')}; "
+        f"(requested_model={requested_model}; returned_model={data.get('model')}; "
         f"completion_tokens={usage.get('completion_tokens')})"
     )

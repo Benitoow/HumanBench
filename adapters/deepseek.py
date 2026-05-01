@@ -24,7 +24,7 @@ class DeepSeekAdapter(ModelAdapter):
         app_url: str | None = None,
     ) -> None:
         if not api_key:
-            raise DeepSeekError("DEEPSEEK_API_KEY est manquante.")
+            raise DeepSeekError("DEEPSEEK_API_KEY is missing.")
 
         headers = {
             "Authorization": f"Bearer {api_key}",
@@ -88,23 +88,23 @@ class DeepSeekAdapter(ModelAdapter):
         except httpx.HTTPStatusError as exc:
             detail = _short_response_text(exc.response)
             raise DeepSeekError(
-                f"DeepSeek a refuse la requete ({exc.response.status_code}). {detail}"
+                f"DeepSeek rejected the request ({exc.response.status_code}). {detail}"
             ) from exc
         except httpx.HTTPError as exc:
-            raise DeepSeekError(f"Erreur reseau DeepSeek: {exc}") from exc
+            raise DeepSeekError(f"DeepSeek network error: {exc}") from exc
         except ValueError as exc:
-            raise DeepSeekError("DeepSeek a renvoye une reponse non JSON.") from exc
+            raise DeepSeekError("DeepSeek returned a non-JSON response.") from exc
 
         choices = data.get("choices") or []
         if not choices:
             raise DeepSeekError(
-                f"DeepSeek n'a renvoye aucun choix. {_response_debug_summary(data, model)}"
+                f"DeepSeek returned no choices. {_response_debug_summary(data, model)}"
             )
 
         choice = choices[0]
         if choice.get("error"):
             raise DeepSeekError(
-                f"DeepSeek a renvoye une erreur de choix. {_choice_debug_summary(choice, data, model)}"
+                f"DeepSeek returned a choice error. {_choice_debug_summary(choice, data, model)}"
             )
 
         message = choice.get("message") or {}
@@ -118,7 +118,7 @@ class DeepSeekAdapter(ModelAdapter):
                     usage=data.get("usage"),
                 )
             raise DeepSeekError(
-                f"DeepSeek a renvoye une reponse vide. {_choice_debug_summary(choice, data, model)}"
+                f"DeepSeek returned an empty response. {_choice_debug_summary(choice, data, model)}"
             )
 
         return Generation(
@@ -148,7 +148,7 @@ def _reasoning_effort(reasoning: dict[str, Any] | None) -> str | None:
         return "max"
     if effort in {"low", "medium"}:
         return "high"
-    raise DeepSeekError(f"reasoning_effort DeepSeek invalide: {effort!r}")
+    raise DeepSeekError(f"Invalid DeepSeek reasoning_effort: {effort!r}")
 
 
 def _normalize_content(content: Any) -> str:
@@ -181,8 +181,8 @@ def _choice_debug_summary(choice: dict[str, Any], data: dict[str, Any], requeste
     usage = data.get("usage") or {}
     choice_error = choice.get("error") or {}
     bits = [
-        f"modele_demande={requested_model}",
-        f"modele_recu={data.get('model')}",
+        f"requested_model={requested_model}",
+        f"returned_model={data.get('model')}",
         f"finish_reason={choice.get('finish_reason')}",
         f"native_finish_reason={choice.get('native_finish_reason')}",
         f"completion_tokens={usage.get('completion_tokens')}",
@@ -190,7 +190,7 @@ def _choice_debug_summary(choice: dict[str, Any], data: dict[str, Any], requeste
     if choice_error:
         bits.append(f"choice_error={choice_error}")
     if isinstance(message, dict):
-        visible_keys = ", ".join(sorted(str(key) for key in message.keys())) or "aucune"
+        visible_keys = ", ".join(sorted(str(key) for key in message.keys())) or "none"
         bits.append(f"message_keys={visible_keys}")
         reasoning_content = message.get("reasoning_content")
         if isinstance(reasoning_content, str) and reasoning_content:
@@ -201,6 +201,6 @@ def _choice_debug_summary(choice: dict[str, Any], data: dict[str, Any], requeste
 def _response_debug_summary(data: dict[str, Any], requested_model: str) -> str:
     usage = data.get("usage") or {}
     return (
-        f"(modele_demande={requested_model}; modele_recu={data.get('model')}; "
+        f"(requested_model={requested_model}; returned_model={data.get('model')}; "
         f"completion_tokens={usage.get('completion_tokens')})"
     )
