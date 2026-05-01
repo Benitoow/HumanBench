@@ -1,0 +1,851 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>HumanBench — Leaderboard v0.1</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; border-radius: 0 !important; }
+
+  :root {
+    --bg: #030a03;
+    --bg-2: #061306;
+    --bg-3: #0a1f0a;
+    --green: #00ff88;
+    --green-2: #00e875;
+    --lime: #aaff00;
+    --orange: #ff6b35;
+    --gold: #f5d020;
+    --silver: #c8d4dc;
+    --bronze: #c98a4b;
+    --dim: #2a4a2a;
+    --dim-2: #1a3a1a;
+    --text: #d4ffe0;
+  }
+
+  html, body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Press Start 2P', monospace;
+    font-size: 12px;
+    line-height: 1.6;
+    image-rendering: pixelated;
+    -webkit-font-smoothing: none;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* ================= FOREST BACKDROP ================= */
+  .forest {
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    overflow: hidden;
+  }
+  .forest::before, .forest::after {
+    content: "";
+    position: absolute;
+    bottom: 0;
+    width: 220px;
+    height: 100%;
+    background-repeat: repeat-y;
+    background-position: top left;
+  }
+  .forest::before {
+    left: 0;
+  }
+  .forest::after {
+    right: 0;
+    transform: scaleX(-1);
+  }
+
+  /* ground line */
+  .ground {
+    position: fixed;
+    left: 0; right: 0; bottom: 0;
+    height: 24px;
+    z-index: 1;
+    pointer-events: none;
+    background:
+      repeating-linear-gradient(90deg,
+        #050f05 0 8px, #081608 8px 16px);
+    border-top: 4px solid #0e2a0e;
+  }
+  .ground::after {
+    content: "";
+    position: absolute;
+    left: 0; right: 0; top: -4px;
+    height: 4px;
+    background: repeating-linear-gradient(90deg, #00e875 0 4px, transparent 4px 16px);
+    opacity: .35;
+  }
+
+  .firefly {
+    position: fixed;
+    width: 4px;
+    height: 4px;
+    background: var(--green);
+    box-shadow:
+      0 0 0 1px #002a14,
+      0 0 6px 2px rgba(0,255,136,.7),
+      0 0 14px 4px rgba(0,255,136,.35);
+    z-index: 2;
+    pointer-events: none;
+    animation: blink 3s steps(1, end) infinite;
+  }
+  @keyframes blink {
+    0%, 40%   { opacity: 1; transform: translate(0,0) scale(1); }
+    45%       { opacity: 0; }
+    50%, 90%  { opacity: 1; transform: translate(2px,-2px) scale(1); }
+    92%       { opacity: 0; }
+    100%      { opacity: 1; }
+  }
+  .firefly.amber {
+    background: var(--lime);
+    box-shadow:
+      0 0 0 1px #1a2a00,
+      0 0 6px 2px rgba(170,255,0,.6),
+      0 0 14px 4px rgba(170,255,0,.25);
+  }
+
+  /* ================= LAYOUT ================= */
+  .wrap {
+    position: relative;
+    z-index: 5;
+    max-width: 1040px;
+    margin: 0 auto;
+    padding: 56px 32px 80px;
+  }
+
+  /* ================= HEADER ================= */
+  header {
+    position: relative;
+    text-align: center;
+    padding: 32px 0 28px;
+    border: 4px solid var(--dim);
+    background: var(--bg-2);
+    box-shadow:
+      inset 0 0 0 4px var(--bg),
+      inset 0 0 0 8px var(--dim-2);
+  }
+  /* corner brackets */
+  header .corner {
+    position: absolute;
+    width: 16px; height: 16px;
+    background: var(--green);
+  }
+  header .corner.tl { top: -4px; left: -4px; }
+  header .corner.tr { top: -4px; right: -4px; }
+  header .corner.bl { bottom: -4px; left: -4px; }
+  header .corner.br { bottom: -4px; right: -4px; }
+
+  .top-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0 20px 18px;
+    font-size: 8px;
+    color: #4a8a5a;
+  }
+  .top-bar .dot {
+    display: inline-block;
+    width: 8px; height: 8px;
+    background: var(--green);
+    margin-right: 8px;
+    vertical-align: middle;
+    animation: pulse 1.4s steps(2, end) infinite;
+  }
+  @keyframes pulse { 0%,49%{opacity:1} 50%,100%{opacity:.2} }
+
+  .badge {
+    color: var(--lime);
+    border: 2px solid var(--dim);
+    padding: 6px 10px;
+    background: var(--bg);
+  }
+
+  h1.title {
+    font-size: 56px;
+    color: var(--green);
+    letter-spacing: 6px;
+    text-shadow:
+      4px 4px 0 #003a1c,
+      0 0 16px rgba(0,255,136,.45);
+    line-height: 1;
+    margin: 8px 0 4px;
+  }
+  h1.title .cursor {
+    display: inline-block;
+    width: 28px;
+    height: 48px;
+    background: var(--green);
+    margin-left: 10px;
+    vertical-align: -4px;
+    box-shadow: 0 0 12px rgba(0,255,136,.7);
+    animation: cursor 1s steps(2, end) infinite;
+  }
+  @keyframes cursor { 0%,49%{opacity:1} 50%,100%{opacity:0} }
+
+  .subtitle {
+    margin-top: 18px;
+    font-size: 13px;
+    letter-spacing: 4px;
+    color: var(--green-2);
+  }
+  .subtitle .q {
+    color: var(--lime);
+  }
+
+  .meta-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 22px;
+    padding: 0 20px;
+    font-size: 8px;
+    color: #4a8a5a;
+  }
+  .meta-row span b {
+    color: var(--green-2);
+    font-weight: normal;
+  }
+
+  /* ================= TABLE HEADER ================= */
+  .table-head {
+    display: grid;
+    grid-template-columns: 70px 1fr 320px 70px 32px;
+    gap: 16px;
+    align-items: center;
+    margin-top: 36px;
+    padding: 12px 16px;
+    background: var(--bg-2);
+    border: 2px solid var(--dim);
+    font-size: 8px;
+    color: #4a8a5a;
+    letter-spacing: 2px;
+  }
+  .table-head .col-bar { text-align: center; }
+  .table-head .col-pct { text-align: right; }
+
+  /* ================= ROWS ================= */
+  .row {
+    display: grid;
+    grid-template-columns: 70px 1fr 320px 70px 32px;
+    gap: 16px;
+    align-items: center;
+    padding: 14px 16px;
+    border: 2px solid var(--dim-2);
+    border-top: none;
+    background: linear-gradient(0deg, var(--bg-2), var(--bg-2)); /* flat */
+    background: var(--bg-2);
+    font-size: 11px;
+    transition: background .15s steps(2, end);
+  }
+  .row:hover { background: var(--bg-3); }
+
+  .row + .row { margin-top: 6px; border-top: 2px solid var(--dim-2); }
+
+  .rank {
+    font-size: 14px;
+    color: var(--green-2);
+    letter-spacing: 1px;
+  }
+  .rank.gold   { color: var(--gold);   text-shadow: 2px 2px 0 #3a2a00; }
+  .rank.silver { color: var(--silver); text-shadow: 2px 2px 0 #1a2228; }
+  .rank.bronze { color: var(--bronze); text-shadow: 2px 2px 0 #2a1808; }
+
+  .model {
+    color: #d4ffe0;
+    letter-spacing: 1px;
+    font-size: 11px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .model .org {
+    display: block;
+    font-size: 7px;
+    color: #4a8a5a;
+    margin-top: 6px;
+    letter-spacing: 2px;
+  }
+  .model .axes {
+    display: block;
+    font-size: 7px;
+    color: #3e764d;
+    margin-top: 6px;
+    letter-spacing: 1px;
+  }
+
+  /* progress bar — chunky pixel */
+  .bar {
+    position: relative;
+    height: 18px;
+    background: var(--bg);
+    border: 2px solid var(--dim);
+    overflow: hidden;
+  }
+  .bar .fill {
+    height: 100%;
+    background-image: repeating-linear-gradient(
+      90deg,
+      currentColor 0 8px,
+      transparent 8px 10px
+    );
+    background-color: currentColor;
+    box-shadow: inset 0 -4px 0 rgba(0,0,0,.25);
+  }
+  .bar.green  { color: var(--green-2); }
+  .bar.lime   { color: var(--lime); }
+  .bar.orange { color: var(--orange); }
+  .bar.gold   { color: var(--gold); }
+
+  .pct {
+    text-align: right;
+    font-size: 13px;
+    letter-spacing: 1px;
+  }
+  .pct.green  { color: var(--green-2); }
+  .pct.lime   { color: var(--lime); }
+  .pct.orange { color: var(--orange); }
+  .pct.gold   { color: var(--gold); text-shadow: 2px 2px 0 #3a2a00; }
+
+  .dot-led {
+    width: 14px; height: 14px;
+    margin: 0 auto;
+    background: var(--green-2);
+    box-shadow: 0 0 8px currentColor;
+  }
+  .dot-led.green  { background: var(--green-2); color: var(--green-2); }
+  .dot-led.lime   { background: var(--lime);    color: var(--lime); }
+  .dot-led.orange { background: var(--orange);  color: var(--orange); }
+  .dot-led.gold   { background: var(--gold);    color: var(--gold); }
+
+  /* ================= HUMAN REFERENCE ================= */
+  .divider {
+    margin: 28px 0 6px;
+    height: 8px;
+    background: repeating-linear-gradient(
+      90deg,
+      var(--gold) 0 8px,
+      transparent 8px 16px
+    );
+    opacity: .8;
+  }
+  .row.human {
+    background: #14100a;
+    border: 2px solid #4a3a10;
+    box-shadow: inset 0 0 0 2px #0a0805;
+  }
+  .row.human .model { color: var(--gold); }
+  .row.human .model .org { color: #8a6a20; }
+  .row.human .star {
+    display: inline-block;
+    color: var(--gold);
+    margin-right: 10px;
+    text-shadow: 2px 2px 0 #3a2a00;
+    animation: twinkle 2s steps(2, end) infinite;
+  }
+  @keyframes twinkle { 0%,60%{opacity:1} 70%,100%{opacity:.5} }
+
+  .divider.bottom {
+    margin: 6px 0 28px;
+  }
+
+  .row.status {
+    grid-template-columns: 1fr;
+    color: #4a8a5a;
+    font-size: 9px;
+    letter-spacing: 2px;
+    text-align: center;
+  }
+
+  /* ================= LEGEND ================= */
+  .legend {
+    margin-top: 40px;
+    padding: 20px 24px;
+    background: var(--bg-2);
+    border: 4px solid var(--dim);
+    box-shadow: inset 0 0 0 2px var(--bg);
+  }
+  .legend-title {
+    font-size: 9px;
+    color: #4a8a5a;
+    letter-spacing: 3px;
+    margin-bottom: 16px;
+  }
+  .legend-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+  }
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 9px;
+    letter-spacing: 1px;
+    color: #a0d8b0;
+  }
+  .legend-item .swatch {
+    width: 20px; height: 20px;
+    flex-shrink: 0;
+    box-shadow: 0 0 8px currentColor;
+  }
+  .swatch.green  { background: var(--green-2); color: var(--green-2); }
+  .swatch.lime   { background: var(--lime);    color: var(--lime); }
+  .swatch.orange { background: var(--orange);  color: var(--orange); }
+  .swatch.gold   { background: var(--gold);    color: var(--gold); }
+
+  /* footer */
+  footer {
+    margin-top: 40px;
+    text-align: center;
+    font-size: 8px;
+    color: #2a5a3a;
+    letter-spacing: 3px;
+  }
+  footer .blink-slow { animation: pulse 2s steps(2, end) infinite; color: var(--green-2);}
+
+  @media (max-width: 760px) {
+    body {
+      font-size: 10px;
+    }
+
+    .forest::before,
+    .forest::after {
+      width: 72px;
+      opacity: .7;
+    }
+
+    .wrap {
+      padding: 28px 12px 72px;
+    }
+
+    header {
+      padding: 22px 0 20px;
+    }
+
+    .top-bar,
+    .meta-row {
+      padding-left: 12px;
+      padding-right: 12px;
+      gap: 12px;
+      flex-wrap: wrap;
+      justify-content: center;
+      text-align: center;
+    }
+
+    h1.title {
+      font-size: 30px;
+      letter-spacing: 1px;
+      text-shadow: 3px 3px 0 #003a1c;
+    }
+
+    h1.title .cursor {
+      width: 14px;
+      height: 28px;
+      margin-left: 5px;
+    }
+
+    .subtitle {
+      font-size: 9px;
+      letter-spacing: 2px;
+    }
+
+    .table-head,
+    .row {
+      grid-template-columns: 48px minmax(0, 1fr) 88px 44px 14px;
+      gap: 6px;
+      padding-left: 8px;
+      padding-right: 8px;
+    }
+
+    .table-head {
+      font-size: 6px;
+      letter-spacing: 1px;
+    }
+
+    .rank {
+      font-size: 10px;
+    }
+
+    .model {
+      font-size: 8px;
+      min-width: 0;
+    }
+
+    .model .org,
+    .model .axes {
+      font-size: 6px;
+      letter-spacing: 1px;
+    }
+
+    .bar {
+      height: 14px;
+    }
+
+    .pct {
+      font-size: 9px;
+    }
+
+    .dot-led {
+      width: 10px;
+      height: 10px;
+    }
+
+    .row.human .star {
+      display: none;
+    }
+
+    .legend {
+      padding: 16px 14px;
+    }
+
+    .legend-grid {
+      grid-template-columns: 1fr;
+      gap: 12px;
+    }
+  }
+</style>
+</head>
+<body>
+
+<!-- pixel forest silhouettes -->
+<div class="forest" id="forest"></div>
+<div class="ground"></div>
+
+<div class="wrap">
+
+  <header>
+    <span class="corner tl"></span>
+    <span class="corner tr"></span>
+    <span class="corner bl"></span>
+    <span class="corner br"></span>
+
+    <div class="top-bar">
+      <span><span class="dot"></span>SYS//ONLINE</span>
+      <span class="badge">LEADERBOARD v0.1</span>
+    </div>
+
+    <h1 class="title">HUMANBENCH<span class="cursor"></span></h1>
+    <div class="subtitle">HOW HUMAN IS YOUR AI<span class="q"> ?</span></div>
+
+    <div class="meta-row">
+      <span>UPDATED <b id="updated-at">LOADING</b></span>
+      <span>MODELS <b id="model-count">--</b> // DATA <b>LIVE</b></span>
+      <span>SEED <b>0x1F4A</b></span>
+    </div>
+  </header>
+
+  <!-- TABLE HEAD -->
+  <div class="table-head">
+    <span>RANK</span>
+    <span>MODEL</span>
+    <span class="col-bar">SCORE</span>
+    <span class="col-pct">%</span>
+    <span></span>
+  </div>
+
+  <!-- HUMAN REFERENCE -->
+  <div class="divider"></div>
+  <div class="row human">
+    <div class="rank gold">★REF</div>
+    <div class="model">
+      <span class="star">✦</span>HUMAN REFERENCE
+      <span class="org">HOMO SAPIENS // BASELINE</span>
+    </div>
+    <div class="bar gold"><div class="fill" style="width:100%"></div></div>
+    <div class="pct gold">100.0</div>
+    <div class="dot-led gold"></div>
+  </div>
+  <div class="divider bottom"></div>
+
+  <!-- ROWS -->
+  <div id="leaderboard-rows">
+    <div class="row status">LOADING RESULTS.JSON</div>
+  </div>
+
+  <!-- LEGEND -->
+  <div class="legend">
+    <div class="legend-title">// LEGEND</div>
+    <div class="legend-grid">
+      <div class="legend-item"><span class="swatch gold"></span>HUMAN REFERENCE — 100%</div>
+      <div class="legend-item"><span class="swatch green"></span>STRONG — 80–100%</div>
+      <div class="legend-item"><span class="swatch lime"></span>MODERATE — 50–79%</div>
+      <div class="legend-item"><span class="swatch orange"></span>WEAK — 0–49%</div>
+      <div class="legend-item">★ &nbsp; GOLD / SILVER / BRONZE — TOP 3</div>
+      <div class="legend-item">● &nbsp; LIVE NODE STATUS</div>
+    </div>
+  </div>
+
+  <footer>
+    <span class="blink-slow">▮</span> &nbsp; HUMANBENCH // OPEN EVAL CONSORTIUM // <span class="blink-slow">▮</span>
+    <br><br>
+    PRESS [ANY KEY] TO CONTINUE
+  </footer>
+
+</div>
+
+<script>
+/* =================================================================
+   PIXEL FOREST — generates two SVG silhouettes (left & right edges)
+   Pure pixels, no curves. Trees are rectangles + diamond canopies.
+   ================================================================= */
+function buildForest() {
+  const W = 220, H = 900; // tall tile, will repeat-y
+  function tree(x, baseY, scale=1, color="#020802") {
+    const trunkW = 8 * scale;
+    const trunkH = (40 + Math.random()*30) * scale;
+    const canopyR = (40 + Math.random()*30) * scale;
+    const cx = x;
+    const cy = baseY - trunkH - canopyR*0.4;
+    // pixel triangle canopy made of stacked rects
+    let canopy = "";
+    const layers = Math.floor(canopyR/6);
+    for (let i=0; i<layers; i++) {
+      const w = (canopyR*2) * (1 - i/layers);
+      canopy += `<rect x="${cx - w/2}" y="${cy - i*6}" width="${w}" height="6" fill="${color}"/>`;
+    }
+    return `
+      <rect x="${cx - trunkW/2}" y="${baseY - trunkH}" width="${trunkW}" height="${trunkH}" fill="${color}"/>
+      ${canopy}
+    `;
+  }
+  function bush(x, baseY, color="#030f03") {
+    const w = 30 + Math.random()*40;
+    const h = 14 + Math.random()*10;
+    return `<rect x="${x - w/2}" y="${baseY - h}" width="${w}" height="${h}" fill="${color}"/>`;
+  }
+  // build tile
+  let svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">`;
+  // back layer (darker, smaller)
+  for (let y = 80; y < H; y += 110) {
+    for (let i = 0; i < 3; i++) {
+      const x = 20 + Math.random()*(W-40);
+      svg += tree(x, y, 0.55, "#031203");
+    }
+  }
+  // mid layer
+  for (let y = 60; y < H; y += 130) {
+    for (let i = 0; i < 2; i++) {
+      const x = 10 + Math.random()*(W-20);
+      svg += tree(x, y+40, 0.85, "#021002");
+    }
+  }
+  // front layer (largest, near edge)
+  for (let y = 0; y < H; y += 160) {
+    const x = 10 + Math.random()*60;
+    svg += tree(x, y+160, 1.2, "#010801");
+  }
+  // bushes near base
+  for (let y = 40; y < H; y += 90) {
+    svg += bush(20 + Math.random()*(W-40), y+30, "#040f04");
+  }
+  // tiny green dots / mushrooms
+  for (let i = 0; i < 18; i++) {
+    const x = 20 + Math.random()*(W-40);
+    const y = Math.random()*H;
+    svg += `<rect x="${x}" y="${y}" width="2" height="2" fill="#00532a"/>`;
+  }
+  svg += `</svg>`;
+  return "url('data:image/svg+xml;utf8," + encodeURIComponent(svg) + "')";
+}
+
+const forestUrl = buildForest();
+const styleEl = document.createElement('style');
+styleEl.textContent = `
+  .forest::before, .forest::after {
+    background-image: ${forestUrl};
+  }
+`;
+document.head.appendChild(styleEl);
+
+/* =================================================================
+   LEADERBOARD — fetches results.json and renders model rows
+   ================================================================= */
+const rowsEl = document.getElementById('leaderboard-rows');
+const updatedAtEl = document.getElementById('updated-at');
+const modelCountEl = document.getElementById('model-count');
+
+function scoreClass(score) {
+  if (score >= 80) return 'green';
+  if (score >= 50) return 'lime';
+  return 'orange';
+}
+
+function rankClass(index) {
+  if (index === 0) return 'gold';
+  if (index === 1) return 'silver';
+  if (index === 2) return 'bronze';
+  return '';
+}
+
+function clampScore(score) {
+  return Math.max(0, Math.min(100, Number(score) || 0));
+}
+
+function formatDate(value) {
+  if (!value || typeof value !== 'string') return 'UNKNOWN';
+  const datePart = value.slice(0, 10);
+  return /^\d{4}-\d{2}-\d{2}$/.test(datePart) ? datePart.replace(/-/g, '.') : 'UNKNOWN';
+}
+
+function parseModelName(value) {
+  const raw = String(value || 'unknown/model');
+  const parts = raw.split('/');
+  if (parts.length >= 2) {
+    return {
+      org: parts[0].replace(/[-_]/g, ' ').toUpperCase(),
+      name: parts.slice(1).join('/').replace(/[-_]/g, ' ').toUpperCase()
+    };
+  }
+  return {
+    org: 'MODEL',
+    name: raw.replace(/[-_]/g, ' ').toUpperCase()
+  };
+}
+
+function renderStatus(message) {
+  rowsEl.replaceChildren();
+  const row = document.createElement('div');
+  row.className = 'row status';
+  row.textContent = message;
+  rowsEl.appendChild(row);
+}
+
+function renderLeaderboard(entries) {
+  const validEntries = entries
+    .filter((entry) => entry && entry.summary && Number.isFinite(Number(entry.summary.score_final)))
+    .sort((a, b) => Number(b.summary.score_final) - Number(a.summary.score_final));
+
+  rowsEl.replaceChildren();
+  modelCountEl.textContent = String(validEntries.length).padStart(2, '0');
+
+  const latestRun = validEntries
+    .map((entry) => entry.created_at)
+    .filter(Boolean)
+    .sort()
+    .at(-1);
+  updatedAtEl.textContent = formatDate(latestRun);
+
+  if (!validEntries.length) {
+    renderStatus('NO VALID RESULTS FOUND');
+    return;
+  }
+
+  const fragment = document.createDocumentFragment();
+  validEntries.forEach((entry, index) => {
+    const score = clampScore(entry.summary.score_final);
+    const color = scoreClass(score);
+    const rankColor = rankClass(index);
+    const model = parseModelName(entry.requested_model);
+
+    const row = document.createElement('div');
+    row.className = 'row';
+
+    const rank = document.createElement('div');
+    rank.className = ['rank', rankColor].filter(Boolean).join(' ');
+    rank.textContent = `#${String(index + 1).padStart(2, '0')}`;
+
+    const modelCell = document.createElement('div');
+    modelCell.className = 'model';
+    modelCell.textContent = model.name;
+
+    const org = document.createElement('span');
+    org.className = 'org';
+    org.textContent = model.org;
+
+    const axes = document.createElement('span');
+    axes.className = 'axes';
+    axes.textContent = `F ${entry.summary.format ?? '--'} / D ${entry.summary.densite ?? '--'} / T ${entry.summary.ton ?? '--'}`;
+
+    modelCell.append(org, axes);
+
+    const bar = document.createElement('div');
+    bar.className = `bar ${color}`;
+    const fill = document.createElement('div');
+    fill.className = 'fill';
+    fill.style.width = `${score}%`;
+    bar.appendChild(fill);
+
+    const pct = document.createElement('div');
+    pct.className = `pct ${color}`;
+    pct.textContent = score.toFixed(1);
+
+    const led = document.createElement('div');
+    led.className = `dot-led ${color}`;
+
+    row.append(rank, modelCell, bar, pct, led);
+    fragment.appendChild(row);
+  });
+
+  rowsEl.appendChild(fragment);
+}
+
+async function loadLeaderboard() {
+  try {
+    const response = await fetch('results.json', { cache: 'no-store' });
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+    const data = await response.json();
+    if (!Array.isArray(data)) {
+      throw new Error('results.json must be an array');
+    }
+    renderLeaderboard(data);
+  } catch (error) {
+    updatedAtEl.textContent = 'ERROR';
+    modelCountEl.textContent = '00';
+    renderStatus(`RESULTS LOAD FAILED // ${error.message.toUpperCase()}`);
+  }
+}
+
+loadLeaderboard();
+
+/* =================================================================
+   FIREFLIES — random blinking specks across the viewport
+   ================================================================= */
+function spawnFireflies() {
+  const N = 38;
+  const frag = document.createDocumentFragment();
+  for (let i = 0; i < N; i++) {
+    const f = document.createElement('div');
+    f.className = 'firefly' + (Math.random() < 0.25 ? ' amber' : '');
+    f.style.left = Math.random()*100 + 'vw';
+    f.style.top  = Math.random()*100 + 'vh';
+    const dur = 2 + Math.random()*4;
+    const delay = Math.random()*-6;
+    f.style.animationDuration = dur + 's';
+    f.style.animationDelay = delay + 's';
+    // gentle drift via inline keyframe override
+    document.body.appendChild(f);
+  }
+  // animate slow drift with JS — chunky steps for pixel feel
+  const flies = document.querySelectorAll('.firefly');
+  flies.forEach((f) => {
+    let t = Math.random()*1000;
+    const ax = 30 + Math.random()*40; // amplitude px
+    const ay = 20 + Math.random()*30;
+    const sx = 0.4 + Math.random()*0.6;
+    const sy = 0.5 + Math.random()*0.7;
+    const baseLeft = parseFloat(f.style.left);
+    const baseTop  = parseFloat(f.style.top);
+    function step() {
+      t += 1;
+      // step to nearest 2px for pixelated feel
+      const dx = Math.round(Math.sin(t*0.02*sx) * ax / 2) * 2;
+      const dy = Math.round(Math.cos(t*0.02*sy) * ay / 2) * 2;
+      f.style.transform = `translate(${dx}px, ${dy}px)`;
+      requestAnimationFrame(step);
+    }
+    step();
+  });
+}
+spawnFireflies();
+</script>
+</body>
+</html>
