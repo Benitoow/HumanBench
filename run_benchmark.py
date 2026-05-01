@@ -12,7 +12,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from dotenv import load_dotenv
+from dotenv import dotenv_values, load_dotenv
 from rich import box
 from rich.align import Align
 from rich.console import Console, Group
@@ -25,6 +25,7 @@ from rich.progress import (
     TextColumn,
     TimeElapsedColumn,
 )
+from rich.prompt import Confirm, Prompt
 from rich.table import Table
 from rich.text import Text
 
@@ -67,6 +68,41 @@ SUPPORTED_BACKENDS = {
     MISTRAL_BACKEND,
     GOOGLE_BACKEND,
 }
+
+# (provider_id, display_name, key_env_name, preset_models)
+_WIZARD_PROVIDERS: list[tuple[str, str, str | None, list[str]]] = [
+    (
+        ANTHROPIC_BACKEND, "Anthropic", "ANTHROPIC_API_KEY",
+        ["claude-opus-4-6", "claude-sonnet-4-6", "claude-haiku-4-5"],
+    ),
+    (
+        OPENAI_BACKEND, "OpenAI", "OPENAI_API_KEY",
+        ["gpt-4.1", "gpt-4o", "gpt-4o-mini", "o3", "o4-mini"],
+    ),
+    (
+        MISTRAL_BACKEND, "Mistral", "MISTRAL_API_KEY",
+        ["mistral-large-latest", "mistral-medium-latest", "mistral-small-latest", "magistral-latest"],
+    ),
+    (
+        GOOGLE_BACKEND, "Google Gemini", "GOOGLE_API_KEY",
+        ["gemini-2.5-pro", "gemini-2.5-flash", "gemini-2.0-flash"],
+    ),
+    (
+        DEEPSEEK_BACKEND, "DeepSeek", "DEEPSEEK_API_KEY",
+        ["deepseek-v4-pro", "deepseek-v4-flash", "deepseek-chat", "deepseek-reasoner"],
+    ),
+    (
+        OPENROUTER_BACKEND, "OpenRouter", "OPENROUTER_API_KEY",
+        [
+            "anthropic/claude-sonnet-4-6",
+            "openai/gpt-4.1",
+            "google/gemini-2.5-flash",
+            "mistralai/mistral-large",
+            "deepseek/deepseek-v4-pro",
+        ],
+    ),
+    ("custom", "Autre / Custom", None, []),
+]
 
 
 class BenchmarkError(RuntimeError):
@@ -476,6 +512,7 @@ def run(args: argparse.Namespace, console: Console) -> None:
         results,
     )
     write_report(output_path, report)
+    sync_leaderboard(console, report)
 
     console.print(render_final_summary(report, output_path))
 
@@ -959,6 +996,58 @@ def summarize_scores(results: list[dict[str, Any]]) -> dict[str, Any]:
 def write_report(path: Path, report: dict[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
+def sync_leaderboard(console: Console, report: dict[str, Any]) -> None:
+    """Synchronize benchmark results to leaderboard files."""
+    results_path = Path("results.json")
+    site_results_path = Path("site/results.json")
+    
+    # Create leaderboard entry from report
+    entry = {
+        "requested_model": report["requested_model"],
+        "created_at": report["created_at"],
+        "summary": report["summary"],
+    }
+    
+    # Load existing results
+    if results_path.exists():
+        leaderboard = json.loads(results_path.read_text(encoding="utf-8"))
+    else:
+        leaderboard = []
+    
+    # Add new entry
+    leaderboard.append(entry)
+    
+    # Write to root results.json
+    results_path.write_text(json.dumps(leaderboard, ensure_ascii=False, indent=2), encoding="utf-8")
+    
+    # Sync to site/results.json
+    site_results_path.parent.mkdir(parents=True, exist_ok=True)
+    site_results_path.write_text(json.dumps(leaderboard, ensure_ascii=False, indent=2), encoding="utf-8")
+    
+    # Check for WEB_REPO_PATH
+    web_repo_path = os.getenv("WEB_REPO_PATH")
+    if not web_repo_path:
+        console.print(
+            Panel(
+                "[yellow]WARNING: WEB_REPO_PATH not configured in .env[/yellow]\n"
+                "Results synchronized locally, but leaderboard repository not updated.\n"
+                "Add [bold]WEB_REPO_PATH=/path/to/leaderboard/repo[/bold] to .env to auto-sync.",
+                title="[bold yellow]Leaderboard Sync[/bold yellow]",
+                border_style="yellow",
+                box=box.ROUNDED,
+            )
+        )
+    else:
+        console.print(
+            Panel(
+                f"Results synchronized to {site_results_path}",
+                title="[bold green]Leaderboard Synced[/bold green]",
+                border_style="green",
+                box=box.ROUNDED,
+            )
+        )
 
 
 def default_output_path(model: str) -> Path:
