@@ -13,6 +13,7 @@ import argparse
 import json
 import os
 import re
+import subprocess
 import sys
 import time
 from contextlib import ExitStack
@@ -74,6 +75,7 @@ TESTED_MODEL_MAX_TOKENS   = 900
 DEFAULT_JUDGE_MAX_TOKENS  = 8192
 MODEL_GENERATION_ATTEMPTS = 3
 JUDGE_GENERATION_ATTEMPTS = 3
+AUTO_PUSH_ENV             = "HUMANBENCH_AUTO_PUSH"
 DEEPSEEK_V4_PRO_MODEL     = "deepseek/deepseek-v4-pro"
 DEEPSEEK_OFFICIAL_PROVIDER = "deepseek"
 OPENROUTER_BACKEND = "openrouter"
@@ -417,6 +419,7 @@ def _print_run_help(console: Console) -> None:
     opts.add_row("--prompts",   f"Custom prompt JSON file. Default: {DEFAULT_PROMPTS_PATH.name}")
     opts.add_row("--verbose",   "Print each full model response in real time.")
     opts.add_row("--output",    "JSON report path. Default: results/<model>_<date>.json")
+    opts.add_row("--no-push",   "Skip automatic git commit/push after syncing the leaderboard.")
     opts.add_row("-h, --help",  "Show this help.")
 
     console.print(render_banner())
@@ -452,6 +455,7 @@ def _build_run_parser(console: Console) -> RichArgumentParser:
     parser.add_argument("--prompts",  default=str(DEFAULT_PROMPTS_PATH),  help="Path to the prompt JSON file.")
     parser.add_argument("--verbose",  action="store_true",                help="Print full model responses.")
     parser.add_argument("--output",   default=None,                       help="JSON report output path.")
+    parser.add_argument("--no-push",  action="store_true",                help="Skip automatic git commit/push after syncing the leaderboard.")
     return parser
 
 
@@ -727,6 +731,7 @@ def run(args: argparse.Namespace, console: Console) -> None:
     write_report(output_path, report)
     sync_leaderboard(console, report)
     console.print(render_final_summary(report, output_path))
+    publish_leaderboard_if_enabled(console, args, report)
 
 
 # ── Backend / adapter helpers ──────────────────────────────────────────────
@@ -1036,6 +1041,90 @@ def sync_leaderboard(console: Console, report: dict[str, Any]) -> None:
     site_results_path.parent.mkdir(parents=True, exist_ok=True)
     site_results_path.write_text(json.dumps(leaderboard, ensure_ascii=False, indent=2), encoding="utf-8")
     console.print(Panel(f"Leaderboard synchronized → {site_results_path}", title="[bold green]Leaderboard Synced[/bold green]", border_style="green", box=box.ROUNDED))
+
+
+def publish_leaderboard_if_enabled(console: Console, args: argparse.Namespace, report: dict[str, Any]) -> None:
+    if getattr(args, "no_push", False) or not _auto_push_enabled_from_env():
+        console.print(Panel("Auto-push skipped. The leaderboard is local until you push it.", title="[bold yellow]Publish Skipped[/bold yellow]", border_style="yellow", box=box.ROUNDED))
+        return
+    publish_leaderboard(console, report)
+
+
+def _auto_push_enabled_from_env() -> bool:
+    value = os.getenv(AUTO_PUSH_ENV)
+    if value is None:
+        return True
+    return value.strip().lower() not in {"0", "false", "no", "off"}
+
+
+def publish_leaderboard(console: Console, report: dict[str, Any]) -> None:
+    paths = [_PROJECT_ROOT / "results.json", _PROJECT_ROOT / "site" / "results.json"]
+    rel_paths = [path.relative_to(_PROJECT_ROOT).as_posix() for path in paths]
+
+    if not _git_ok(["rev-parse", "--is-inside-work-tree"]):
+        console.print(Panel("Auto-push skipped: this project is not inside a git repository.", title="[bold yellow]Publish Skipped[/bold yellow]", border_style="yellow", box=box.ROUNDED))
+        return
+
+    if _git_has_changes(rel_paths):
+        summary = report["summary"]
+        score = int(summary.get("score_final", 0))
+        model = str(report.get("requested_model", "model"))
+        message = f"Update leaderboard: {model} {score}%"
+        commit = _git(["commit", "--only", "-m", message, "--", *rel_paths])
+        if commit.returncode != 0:
+            console.print(Panel(_git_output(commit), title="[bold red]Publish Failed: Commit[/bold red]", border_style="red", box=box.ROUNDED))
+            return
+
+    push_args = _git_push_args()
+    if push_args is None:
+        console.print(Panel("Auto-push skipped: no current branch or no `origin` remote.", title="[bold yellow]Publish Skipped[/bold yellow]", border_style="yellow", box=box.ROUNDED))
+        return
+
+    push = _git(push_args)
+    if push.returncode != 0:
+        console.print(Panel(_git_output(push), title="[bold red]Publish Failed: Push[/bold red]", border_style="red", box=box.ROUNDED))
+        return
+
+    console.print(Panel(_git_output(push) or "Everything up-to-date.", title="[bold green]Leaderboard Published[/bold green]", border_style="green", box=box.ROUNDED))
+
+
+def _git_has_changes(rel_paths: list[str]) -> bool:
+    return _git(["diff", "--quiet", "HEAD", "--", *rel_paths]).returncode != 0
+
+
+def _git_push_args() -> list[str] | None:
+    branch = _git(["branch", "--show-current"])
+    current_branch = branch.stdout.strip()
+    if branch.returncode != 0 or not current_branch:
+        return None
+
+    upstream = _git(["rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}"])
+    if upstream.returncode == 0:
+        return ["push"]
+
+    origin = _git(["remote", "get-url", "origin"])
+    if origin.returncode != 0:
+        return None
+    return ["push", "-u", "origin", current_branch]
+
+
+def _git_ok(args: list[str]) -> bool:
+    return _git(args).returncode == 0
+
+
+def _git(args: list[str]) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(
+        ["git", *args],
+        cwd=_PROJECT_ROOT,
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    )
+
+
+def _git_output(result: subprocess.CompletedProcess[str]) -> str:
+    output = "\n".join(part.strip() for part in (result.stdout, result.stderr) if part.strip())
+    return output[-3000:] if len(output) > 3000 else output
 
 
 def default_output_path(model: str) -> Path:

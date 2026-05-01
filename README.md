@@ -76,6 +76,22 @@ humanbench run --provider google --model gemini-2.5-flash
 
 The JSON report is written to `results/` by default.
 
+After a successful run, HumanBench also syncs the public leaderboard files
+(`results.json` and `site/results.json`), commits those two files, and pushes
+the current branch to `origin`.
+
+To run locally without publishing:
+
+```bash
+humanbench run anthropic/claude-sonnet-4-6 --no-push
+```
+
+You can also disable auto-push from `.env`:
+
+```bash
+HUMANBENCH_AUTO_PUSH=0
+```
+
 ---
 
 ## Commands
@@ -173,6 +189,7 @@ HumanBench/
 
 - Never commit `.env` or any file containing API keys
 - Keep generated reports in `results/` out of commits unless they are intentional artifacts
+- Auto-publish commits only the public leaderboard files; raw `results/*.json` reports stay gitignored
 - Use `.env.example` as the only shared config template
 - Review diffs before merging — secrets slip in quietly
 
