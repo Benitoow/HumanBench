@@ -1,62 +1,60 @@
-# HumanBench
+# HUMANBENCH
 
-HumanBench is a terminal-first benchmark for measuring how closely an LLM sounds like a calibrated human rather than a polished product brochure.
+> *Does your model sound like a human or a press release?*
 
-It is intentionally opinionated:
+HumanBench is a terminal-first benchmark that measures how closely an LLM sounds like a calibrated human — not a polished product brochure.
 
-- no web UI
-- no dashboard
-- no Electron wrapper
-- just terminal output, JSON reports, and a scoring framework you can audit
+Intentionally opinionated. No web UI. No dashboard. No Electron wrapper.  
+Just terminal output, JSON reports, and a scoring framework you can audit.
 
-## What it does
+---
 
-- runs a model against a curated prompt set
-- asks a judge model to score the answer on three axes:
-	- format
-	- density
-	- tone
-- stores a machine-readable JSON report in `results/`
-- supports multiple model providers through adapters
+## How it works
+
+HumanBench runs a model against a curated prompt set, then asks a fixed judge to score each answer on three axes:
+
+| Axis | What it measures |
+|------|-----------------|
+| **Format** | Does the structure feel natural or template-generated? |
+| **Density** | Is the information weight appropriate, or bloated? |
+| **Tone** | Does it read like a human wrote it, or like a feature spec? |
+
+Results are stored as machine-readable JSON in `results/` and rendered on the live leaderboard.
+
+---
 
 ## Requirements
 
 - Python 3.10+
 - One or more provider API keys
-- A terminal that can display ANSI colors well enough to enjoy the vibe
+- A terminal that renders ANSI colors well enough to enjoy the vibe
+
+---
 
 ## Quick start
 
-### 1) Create and activate a virtual environment
+**1 — Create and activate a virtual environment**
 
 ```bash
 python -m venv .venv
-.venv\Scripts\activate
+.venv\Scripts\activate        # Windows
+# source .venv/bin/activate   # macOS / Linux
 ```
 
-### 2) Install dependencies
+**2 — Install dependencies**
 
 ```bash
 pip install -r requirements.txt
 ```
 
-### 3) Create your local environment file
+**3 — Set up environment**
 
 ```bash
-copy .env.example .env
+copy .env.example .env   # Windows
+# cp .env.example .env   # macOS / Linux
 ```
 
-On PowerShell, you can also use:
-
-```powershell
-Copy-Item .env.example .env
-```
-
-### 4) Add your API keys
-
-Edit `.env` and provide the providers you plan to use.
-
-Example:
+Edit `.env` and fill in the providers you plan to use:
 
 ```env
 PROVIDER=auto
@@ -69,13 +67,15 @@ MISTRAL_API_KEY=xxxx
 GOOGLE_API_KEY=xxxx
 ```
 
-## Run a benchmark
+---
+
+## Running a benchmark
 
 ```bash
 python run_benchmark.py --model anthropic/claude-sonnet-4-6
 ```
 
-Useful variations:
+Other examples:
 
 ```bash
 python run_benchmark.py --model openai/gpt-4.1 --verbose
@@ -86,100 +86,93 @@ python run_benchmark.py --provider anthropic --model claude-sonnet-4-5
 python run_benchmark.py --provider google --model gemini-2.5-flash
 ```
 
-By default, the JSON report is written to `results/`.
+The JSON report is written to `results/` by default.
 
-## Providers and routing
+---
 
-HumanBench supports both OpenRouter and native providers via adapters.
+## Providers
 
-Supported backends:
+| Backend | Key in `.env` | Notes |
+|---------|--------------|-------|
+| `openrouter` | `OPENROUTER_API_KEY` | Routes to any provider |
+| `deepseek` | `DEEPSEEK_API_KEY` | Native DeepSeek API |
+| `anthropic` | `ANTHROPIC_API_KEY` | Native Anthropic API |
+| `openai` | `OPENAI_API_KEY` | Native OpenAI API |
+| `mistral` | `MISTRAL_API_KEY` | Native Mistral API |
+| `google` | `GOOGLE_API_KEY` | Native Gemini API |
 
-- `openrouter`
-- `deepseek`
-- `anthropic`
-- `openai`
-- `mistral`
-- `google`
+Set the active backend with `PROVIDER=` in `.env`.
 
-The tested model provider is configured through `PROVIDER`.
+> **Judge** — hardcoded to `deepseek/deepseek-v4-pro` via OpenRouter, fallbacks disabled, `xhigh` reasoning. This is intentional. Swapping judges between runs makes scores incomparable.
 
-The judge is intentionally hardcoded in `run_benchmark.py` to `deepseek/deepseek-v4-pro` through OpenRouter, routed to the official `deepseek` provider with fallbacks disabled and `xhigh` reasoning. Changing the judge from run to run would turn the benchmark into confetti with a CLI.
-
-If you use DeepSeek directly, set `PROVIDER=deepseek` with `DEEPSEEK_API_KEY` and a native model such as `deepseek-v4-pro` or `deepseek-v4-flash`.
+---
 
 ## Output
 
-Each run produces a JSON summary containing:
+Each run produces a JSON summary with:
 
 - prompt metadata
 - tested model and fixed judge configuration
-- per-prompt scores
+- per-prompt scores (format, density, tone)
 - final aggregate score
 - report timestamp
 
-The report file is safe to archive and easy to diff across runs.
+The file is safe to archive and easy to diff across runs.
 
-## Project structure
-
-```text
-HumanBench/
-├── adapters/           # provider-specific model adapters
-├── judge/              # judge prompt and scoring logic support
-├── prompts.json        # benchmark prompts
-├── results/            # generated benchmark reports
-├── run_benchmark.py    # main CLI entrypoint
-├── SCORING_FRAMEWORK.md
-├── README.md
-├── requirements.txt
-└── .env.example
-```
+---
 
 ## Submit a Result
 
-To submit a benchmark result to the public leaderboard, follow these steps.
+To get your result on the public leaderboard:
 
-### 1. Run the benchmark
+**1 — Run the benchmark**
 
 ```bash
 python run_benchmark.py --model your-org/your-model
 ```
 
-The JSON report is saved automatically to `results/`.
+**2 — Submit via the site**
 
-### 2. Submit via the website
+Click **[ SUBMIT A RUN ]** on the leaderboard — in the header or below the table. Fill in:
 
-Open the leaderboard site and click **[ SUBMIT A RUN ]** — either in the header or below the leaderboard table.
+- **Model name** — the `org/model` string, e.g. `anthropic/claude-sonnet-4-6`
+- **Provider** — the backend used, e.g. `openrouter`, `anthropic`
+- **Result JSON** — the `.json` file from `results/`
 
-Fill in the form:
+You will see: `RUN RECEIVED // PENDING VALIDATION`
 
-- **Model name** — the `org/model` identifier used when running the benchmark, e.g. `anthropic/claude-sonnet-4-6`
-- **Provider** — the API backend you used, e.g. `anthropic`, `openrouter`, `deepseek`
-- **Result JSON** — the `.json` file generated in `results/`
+**3 — Validation**
 
-Hit submit. You will see: `RUN RECEIVED // PENDING VALIDATION`.
+Results are reviewed manually before appearing on the leaderboard. Scores are verified against the benchmark protocol.
 
-### 3. Validation
+---
 
-Submitted results are reviewed manually before appearing on the leaderboard. Scores are verified against the benchmark protocol to ensure reproducibility and integrity.
+## Project structure
 
-> **Site maintainers:** The submission form uses [Formspree](https://formspree.io) to forward results by email. Before the form goes live, replace `YOUR_FORM_ID` in `site/index.html` (the `action` attribute of `#submitForm`) with your actual Formspree form ID. Create a free account at formspree.io, set up a new form with `humanbenchpro@gmail.com` as the notification address, and copy the form ID from the dashboard.
+```
+HumanBench/
+├── adapters/            # provider-specific model adapters
+├── judge/               # judge prompt and scoring support
+├── site/                # leaderboard website
+├── prompts.json         # benchmark prompt set
+├── results/             # generated reports (gitignored)
+├── run_benchmark.py     # CLI entrypoint
+├── SCORING_FRAMEWORK.md
+├── requirements.txt
+└── .env.example
+```
 
-## Repository safety
+---
 
-HumanBench is open source, but the repository should stay clean:
+## Repository hygiene
 
-- never commit `.env`
-- keep API keys out of source control
-- keep generated reports in `results/` out of commits unless they are intentional artifacts
-- use `.env.example` as the only shared configuration template
-- review diffs before merging to make sure no secrets or personal data slipped in
+- Never commit `.env` or any file containing API keys
+- Keep generated reports in `results/` out of commits unless they are intentional artifacts
+- Use `.env.example` as the only shared config template
+- Review diffs before merging — secrets slip in quietly
 
-## Notes
-
-- There is no Phase 3 roadmap here.
-- The leaderboard concept was intentionally dropped for now.
-- The project currently focuses on a clean terminal benchmark and a transparent scoring system.
+---
 
 ## License
 
-Add the license that matches your open-source release before publishing the repository publicly.
+Add the license that matches your open-source release before publishing publicly.
