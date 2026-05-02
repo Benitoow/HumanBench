@@ -42,5 +42,16 @@
       "ton": 31,
       "interpretation": "Very human"
     }
+  },
+  {
+    "requested_model": "openai/gpt-5.5",
+    "created_at": "2026-05-02T19:34:10+02:00",
+    "summary": {
+      "score_final": 68,
+      "format": 18,
+      "densite": 24,
+      "ton": 26,
+      "interpretation": "Good, with visible AI tics"
+    }
   }
 ]
