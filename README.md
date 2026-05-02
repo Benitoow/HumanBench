@@ -76,6 +76,24 @@ humanbench run --provider google --model gemini-2.5-flash
 
 The JSON report is written to `results/` by default.
 
+### Multiple runs and multiple models
+
+Single-run scores carry noise from model temperature and judge variance. To reduce that, average several runs:
+
+```bash
+humanbench run anthropic/claude-opus-4-7 --runs 5
+```
+
+Each run produces its own report; an aggregated report (`<model>_<date>_avgN.json`) is then written with the **mean score and standard deviation per axis**. Only the aggregate is pushed to the leaderboard.
+
+Compare several models in one shot — `--runs` applies to each:
+
+```bash
+humanbench run claude-sonnet-4-6 gpt-4.1 mistral-large --runs 3
+```
+
+A side-by-side comparison table prints at the end, ranked by score with the standard deviation shown when `--runs > 1`.
+
 After a successful run, HumanBench also syncs the public leaderboard files
 (`results.json` and `site/results.json`), commits those two files, and pushes
 the current branch to `origin`.

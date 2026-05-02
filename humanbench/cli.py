@@ -36,6 +36,7 @@ from rich.progress import (
     TimeElapsedColumn,
 )
 from rich.prompt import Confirm, Prompt
+from rich.rule import Rule
 from rich.table import Table
 from rich.text import Text
 
@@ -351,20 +352,25 @@ def _cmd_config(console: Console) -> int:
 
 
 def _cmd_run(console: Console, argv: list[str]) -> int:
-    """humanbench run [model] [options] — run the benchmark."""
-    # Positional model support: humanbench run anthropic/claude-sonnet-4-6
-    if argv and not argv[0].startswith("-"):
-        model_pos = argv[0]
-        rest = argv[1:]
-        if not any(a == "--model" or a.startswith("--model=") for a in rest):
-            argv = ["--model", model_pos] + rest
+    """humanbench run [model ...] [options] — run the benchmark on one or more models."""
+    # Collect leading positional model names (stop at first flag)
+    models_positional: list[str] = []
+    rest = list(argv)
+    while rest and not rest[0].startswith("-"):
+        models_positional.append(rest.pop(0))
 
-    if any(a in ("-h", "--help") for a in argv):
+    if any(a in ("-h", "--help") for a in rest):
         _print_run_help(console)
         return 0
 
     parser = _build_run_parser(console)
-    args = parser.parse_args(argv)
+    args = parser.parse_args(rest)
+
+    # Combine positional models with --model flag (deduped, positional first)
+    flag_model = args.model or ""
+    all_models: list[str] = list(dict.fromkeys(
+        m for m in models_positional + ([flag_model] if flag_model else []) if m
+    ))
 
     if _wizard_needed():
         try:
@@ -374,14 +380,96 @@ def _cmd_run(console: Console, argv: list[str]) -> int:
             console.print(Panel(Text("Setup cancelled.", style="bold red"), title="[bold red]Cancelled[/bold red]", border_style="red", box=box.ROUNDED))
             return 130
 
-    try:
-        run(args, console)
-    except KeyboardInterrupt:
-        console.print(Panel("Benchmark interrupted. Fine. Humans are allowed to pull the plug.", title="[bold yellow]Stop[/bold yellow]", border_style="yellow", box=box.ROUNDED))
-        return 130
-    except (BenchmarkError, AdapterError) as exc:
-        console.print(Panel(str(exc), title="[bold red]Benchmark blocked[/bold red]", border_style="red", box=box.ROUNDED))
-        return 1
+    runs_per_model = max(1, int(getattr(args, "runs", 1) or 1))
+
+    # Single model + single run → original behaviour
+    if len(all_models) <= 1 and runs_per_model == 1:
+        if all_models:
+            args.model = all_models[0]
+        try:
+            run(args, console)
+        except KeyboardInterrupt:
+            console.print(Panel("Benchmark interrupted.", title="[bold yellow]Stop[/bold yellow]", border_style="yellow", box=box.ROUNDED))
+            return 130
+        except (BenchmarkError, AdapterError) as exc:
+            console.print(Panel(str(exc), title="[bold red]Benchmark blocked[/bold red]", border_style="red", box=box.ROUNDED))
+            return 1
+        return 0
+
+    if not all_models:
+        # No models given but --runs > 1: fall back to MODEL_TESTED
+        env_model = _optional_string(os.getenv("MODEL_TESTED"))
+        if not env_model:
+            console.print(Panel("No model specified. Use `humanbench run <model>` or set MODEL_TESTED in .env.", title="[bold red]Error[/bold red]", border_style="red", box=box.ROUNDED))
+            return 1
+        all_models = [env_model]
+
+    # ── Multi-model and/or multi-run flow ────────────────────────────────────
+    aggregated_per_model: list[dict[str, Any]] = []
+    failed:               list[str]            = []
+
+    for mi, model in enumerate(all_models):
+        if mi > 0:
+            console.print()
+            console.print(Rule(style="bright_black"))
+            console.print()
+
+        args.model = model
+
+        if runs_per_model == 1:
+            try:
+                report = run(args, console)
+                aggregated_per_model.append(report)
+            except KeyboardInterrupt:
+                console.print(Panel("Benchmark interrupted.", title="[bold yellow]Stop[/bold yellow]", border_style="yellow", box=box.ROUNDED))
+                break
+            except (BenchmarkError, AdapterError) as exc:
+                console.print(Panel(f"[bold]{model}[/bold]\n{exc}", title="[bold red]Skipped[/bold red]", border_style="red", box=box.ROUNDED))
+                failed.append(model)
+            continue
+
+        # runs_per_model > 1 → run N times silently w.r.t. leaderboard, then aggregate
+        single_runs: list[dict[str, Any]] = []
+        args._skip_publish = True
+        try:
+            for ri in range(runs_per_model):
+                console.print()
+                console.print(Panel(f"[bold cyan]{model}[/bold cyan]   run [bold]{ri + 1}[/bold] / {runs_per_model}", border_style="bright_black", box=box.ROUNDED, padding=(0, 2)))
+                report = run(args, console)
+                single_runs.append(report)
+        except KeyboardInterrupt:
+            console.print(Panel("Benchmark interrupted.", title="[bold yellow]Stop[/bold yellow]", border_style="yellow", box=box.ROUNDED))
+            break
+        except (BenchmarkError, AdapterError) as exc:
+            console.print(Panel(f"[bold]{model}[/bold]\n{exc}", title="[bold red]Skipped[/bold red]", border_style="red", box=box.ROUNDED))
+            failed.append(model)
+            args._skip_publish = False
+            continue
+        args._skip_publish = False
+
+        if not single_runs:
+            continue
+
+        aggregated = aggregate_runs(single_runs)
+        agg_path = aggregated_output_path(aggregated.get("requested_model") or aggregated.get("model") or "model", len(single_runs))
+        aggregated["output_path"] = str(agg_path)
+        write_report(agg_path, aggregated)
+
+        console.print(render_aggregated_summary(aggregated, agg_path))
+
+        # One leaderboard entry per model (the aggregate)
+        sync_leaderboard(console, aggregated)
+        publish_leaderboard_if_enabled(console, args, aggregated)
+
+        aggregated_per_model.append(aggregated)
+
+    if len(aggregated_per_model) > 1:
+        console.print()
+        console.print(Rule(style="bright_cyan"))
+        console.print(render_multi_comparison(aggregated_per_model))
+
+    if failed:
+        console.print(Panel("\n".join(f"  • {m}" for m in failed), title="[bold red]Failed models[/bold red]", border_style="red", box=box.ROUNDED))
 
     return 0
 
@@ -392,9 +480,9 @@ def _print_top_help(console: Console) -> None:
     cmds = Table(box=box.SIMPLE_HEAVY, show_header=True, header_style="bold magenta", border_style="bright_black")
     cmds.add_column("Command", style="cyan", no_wrap=True)
     cmds.add_column("Description", style="white")
-    cmds.add_row("humanbench config",        "Interactive setup wizard — configure keys & default model")
-    cmds.add_row("humanbench run [model]",   "Run the benchmark on a model")
-    cmds.add_row("humanbench run --help",    "Show all options for the run subcommand")
+    cmds.add_row("humanbench config",              "Interactive setup wizard — configure keys & default model")
+    cmds.add_row("humanbench run [model ...]",     "Run the benchmark (one or more models)")
+    cmds.add_row("humanbench run --help",          "Show all options for the run subcommand")
     cmds.add_row("humanbench --version",     "Show version")
     cmds.add_row("humanbench --help",        "Show this message")
 
@@ -408,19 +496,22 @@ def _print_run_help(console: Console) -> None:
     usage.add_column(style="white")
     usage.add_row("Usage",   "humanbench run [model] [options]")
     usage.add_row("",        "humanbench run anthropic/claude-sonnet-4-6")
+    usage.add_row("",        "humanbench run anthropic/claude-opus-4-7 -n 5      [bold green]# 5 runs averaged[/bold green]")
+    usage.add_row("",        "humanbench run claude-sonnet-4-6 gpt-4.1 -n 3      [bold green]# 3 runs × 2 models[/bold green]")
     usage.add_row("",        "humanbench run --model openai/gpt-4.1 --verbose")
 
     opts = Table(box=box.SIMPLE_HEAVY, show_header=True, header_style="bold magenta", border_style="bright_black")
-    opts.add_column("Option",    style="cyan", no_wrap=True)
+    opts.add_column("Option",      style="cyan", no_wrap=True)
     opts.add_column("Description", style="white")
-    opts.add_row("[model]",     "Model to test (positional). Takes priority over --model.")
-    opts.add_row("--model",     "Model to test (flag, backwards compatible).")
-    opts.add_row("--provider",  "API backend: auto, anthropic, openai, mistral, google, deepseek, openrouter.")
-    opts.add_row("--prompts",   f"Custom prompt JSON file. Default: {DEFAULT_PROMPTS_PATH.name}")
-    opts.add_row("--verbose",   "Print each full model response in real time.")
-    opts.add_row("--output",    "JSON report path. Default: results/<model>_<date>.json")
-    opts.add_row("--no-push",   "Skip automatic git commit/push after syncing the leaderboard.")
-    opts.add_row("-h, --help",  "Show this help.")
+    opts.add_row("[model ...]",    "One or more models to test (positional).")
+    opts.add_row("--model",        "Model to test (flag, backwards compatible).")
+    opts.add_row("--runs, -n N",   "Number of runs per model to average scores (default 1).")
+    opts.add_row("--provider",     "API backend: auto, anthropic, openai, mistral, google, deepseek, openrouter.")
+    opts.add_row("--prompts",      f"Custom prompt JSON file. Default: {DEFAULT_PROMPTS_PATH.name}")
+    opts.add_row("--verbose",      "Print each full model response in real time.")
+    opts.add_row("--output",       "JSON report path. Default: results/<model>_<date>.json")
+    opts.add_row("--no-push",      "Skip automatic git commit/push after syncing the leaderboard.")
+    opts.add_row("-h, --help",     "Show this help.")
 
     console.print(render_banner())
     console.print(Panel(Group(usage, Text(""), opts), title="[bold cyan]humanbench run[/bold cyan]", border_style="cyan", box=box.ROUNDED))
@@ -456,6 +547,7 @@ def _build_run_parser(console: Console) -> RichArgumentParser:
     parser.add_argument("--verbose",  action="store_true",                help="Print full model responses.")
     parser.add_argument("--output",   default=None,                       help="JSON report output path.")
     parser.add_argument("--no-push",  action="store_true",                help="Skip automatic git commit/push after syncing the leaderboard.")
+    parser.add_argument("--runs", "-n", type=int, default=1, metavar="N",  help="Number of runs per model to average scores (default 1).")
     return parser
 
 
@@ -657,7 +749,7 @@ def run_setup_wizard(
 #  BENCHMARK CORE
 # ═══════════════════════════════════════════════════════════════════════════
 
-def run(args: argparse.Namespace, console: Console) -> None:
+def run(args: argparse.Namespace, console: Console) -> dict[str, Any]:
     load_dotenv(str(_ENV_PATH))
 
     requested_model = _optional_string(args.model) or _optional_string(os.getenv("MODEL_TESTED"))
@@ -729,9 +821,11 @@ def run(args: argparse.Namespace, console: Console) -> None:
 
     report = build_report(model_backend_config, judge_backend_config, requested_model, backend_model, backend_judge_model, judge_config, prompts_path, output_path, results)
     write_report(output_path, report)
-    sync_leaderboard(console, report)
     console.print(render_final_summary(report, output_path))
-    publish_leaderboard_if_enabled(console, args, report)
+    if not getattr(args, "_skip_publish", False):
+        sync_leaderboard(console, report)
+        publish_leaderboard_if_enabled(console, args, report)
+    return report
 
 
 # ── Backend / adapter helpers ──────────────────────────────────────────────
@@ -1031,6 +1125,68 @@ def write_report(path: Path, report: dict[str, Any]) -> None:
     path.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
+def aggregate_runs(reports: list[dict[str, Any]]) -> dict[str, Any]:
+    """Build an averaged report from N runs of the same model.
+
+    Returns a dict with the same surface as a single report (so the leaderboard
+    and comparison table treat it uniformly) plus a `runs` array and per-axis
+    standard deviation for variance visibility.
+    """
+    if not reports:
+        raise BenchmarkError("aggregate_runs called with no reports")
+    if len(reports) == 1:
+        return reports[0]
+
+    base = reports[0]
+    finals  = [int(r["summary"]["score_final"]) for r in reports]
+    formats = [int(r["summary"]["format"])      for r in reports]
+    densis  = [int(r["summary"]["densite"])     for r in reports]
+    tons    = [int(r["summary"]["ton"])         for r in reports]
+
+    def _mean(xs: list[int]) -> int:
+        return round(sum(xs) / len(xs))
+
+    def _std(xs: list[int]) -> float:
+        m = sum(xs) / len(xs)
+        return round((sum((x - m) ** 2 for x in xs) / len(xs)) ** 0.5, 2)
+
+    avg_final = _mean(finals)
+    summary = {
+        "score_final":   avg_final,
+        "format":        _mean(formats),
+        "densite":       _mean(densis),
+        "ton":           _mean(tons),
+        "interpretation": score_label(avg_final),
+        "runs_count":    len(reports),
+        "stddev": {
+            "score_final": _std(finals),
+            "format":      _std(formats),
+            "densite":     _std(densis),
+            "ton":         _std(tons),
+        },
+        "per_run": [
+            {"score_final": finals[i], "format": formats[i], "densite": densis[i], "ton": tons[i]}
+            for i in range(len(reports))
+        ],
+    }
+
+    aggregated = {
+        **{k: v for k, v in base.items() if k not in ("summary", "results", "output_path")},
+        "created_at":  datetime.now().astimezone().isoformat(timespec="seconds"),
+        "runs_count":  len(reports),
+        "summary":     summary,
+        "runs":        [{"created_at": r["created_at"], "summary": r["summary"], "output_path": r.get("output_path")} for r in reports],
+        "results":     reports[-1]["results"],
+    }
+    return aggregated
+
+
+def aggregated_output_path(model: str, runs: int) -> Path:
+    safe_model = re.sub(r"[^A-Za-z0-9_.-]+", "_", model).strip("_") or "model"
+    stamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    return _PROJECT_ROOT / "results" / f"{safe_model}_{stamp}_avg{runs}.json"
+
+
 def sync_leaderboard(console: Console, report: dict[str, Any]) -> None:
     results_path      = _PROJECT_ROOT / "results.json"
     site_results_path = _PROJECT_ROOT / "site" / "results.json"
@@ -1204,6 +1360,111 @@ def render_block_bar(*, filled: int, width: int, complete_style: str, remaining_
     bar.append("░" * (width - filled), style=remaining_style)
     bar.append("]", style="bright_black")
     return bar
+
+
+def render_multi_comparison(reports: list[dict[str, Any]]) -> Group:
+    sorted_reports = sorted(reports, key=lambda r: r["summary"]["score_final"], reverse=True)
+    has_runs = any(int(r["summary"].get("runs_count", 1)) > 1 for r in sorted_reports)
+
+    tbl = Table(
+        box=box.DOUBLE, border_style="bright_cyan",
+        show_header=True, header_style="bold cyan",
+        padding=(0, 1), expand=False,
+    )
+    tbl.add_column("#",       style="bold",  no_wrap=True, justify="center", width=4)
+    tbl.add_column("MODEL",   style="white", no_wrap=True)
+    if has_runs:
+        tbl.add_column("RUNS", justify="right", no_wrap=True, width=5)
+    tbl.add_column("SCORE",   justify="right", no_wrap=True, width=10)
+    if has_runs:
+        tbl.add_column("± σ",  justify="right", no_wrap=True, width=6)
+    tbl.add_column("FORMAT",  justify="right", no_wrap=True, width=8)
+    tbl.add_column("DENSITY", justify="right", no_wrap=True, width=9)
+    tbl.add_column("TONE",    justify="right", no_wrap=True, width=7)
+    tbl.add_column("",        no_wrap=True, width=26)
+
+    rank_styles = ["bold yellow", "bold white", "bold cyan"]
+    medals      = ["🥇", "🥈", "🥉"]
+
+    for i, report in enumerate(sorted_reports):
+        s     = report["summary"]
+        final = int(s["score_final"])
+        color = score_color(final)
+        rstyle = rank_styles[i] if i < 3 else "dim"
+        medal  = medals[i] if i < 3 else f"#{i + 1}"
+        model_label = report.get("requested_model", report.get("model", "?"))
+        runs_n  = int(s.get("runs_count", 1))
+        std_val = s.get("stddev", {}).get("score_final")
+
+        row = [
+            Text(medal,  style=rstyle),
+            Text(model_label, style="bold white" if i == 0 else "white"),
+        ]
+        if has_runs:
+            row.append(Text(f"×{runs_n}" if runs_n > 1 else "—", style="bright_black"))
+        row.append(Text(f"{final}%", style=f"bold {color}"))
+        if has_runs:
+            row.append(Text(f"±{std_val:.1f}" if std_val is not None and runs_n > 1 else "—", style="bright_black"))
+        row.extend([
+            Text(f"{s['format']}/33",  style="cyan"),
+            Text(f"{s['densite']}/33", style="cyan"),
+            Text(f"{s['ton']}/34",     style="cyan"),
+            render_score_bar(final, width=22),
+        ])
+        tbl.add_row(*row)
+
+    title_line = Text("  MULTI-MODEL COMPARISON ", style="bold bright_cyan")
+    title_line.append(f"— {len(reports)} models", style="bright_black")
+
+    return Group(
+        Text(""),
+        Align.left(title_line),
+        Text(""),
+        tbl,
+        Text(""),
+    )
+
+
+def render_aggregated_summary(report: dict[str, Any], output_path: Path) -> Group:
+    """Per-model aggregate summary across N runs, with mean + stddev + per-run scores."""
+    s        = report["summary"]
+    runs_n   = int(s.get("runs_count", 1))
+    final    = int(s["score_final"])
+    color    = score_color(final)
+    std      = s.get("stddev", {})
+    per_run  = s.get("per_run", [])
+
+    score_line = Text("  ")
+    score_line.append("AGGREGATE SCORE  ", style="bold cyan")
+    score_line.append(f"{final}%   ", style=f"bold {color}")
+    score_line.append(score_indicator(final), style=f"bold {color}")
+    score_line.append(f" {s['interpretation']}  ", style=f"bold {color}")
+    score_line.append(f"(n={runs_n})", style="bright_black")
+
+    bits: list[Any] = [
+        Text(""),
+        render_separator(),
+        score_line,
+        render_kv_line("Format",    f"{s['format']}/33   ±{std.get('format', 0)}"),
+        render_kv_line("Density",   f"{s['densite']}/33   ±{std.get('densite', 0)}"),
+        render_kv_line("Tone",      f"{s['ton']}/34   ±{std.get('ton', 0)}"),
+        render_kv_line("Score σ",   f"±{std.get('score_final', 0)}"),
+        render_separator(),
+    ]
+
+    if per_run:
+        per_run_line = Text("  ")
+        per_run_line.append("PER-RUN          ", style="bold cyan")
+        for i, pr in enumerate(per_run):
+            per_run_line.append(f"r{i + 1}=", style="bright_black")
+            per_run_line.append(f"{pr['score_final']}%", style=score_color(int(pr["score_final"])))
+            if i < len(per_run) - 1:
+                per_run_line.append("  ", style="bright_black")
+        bits.append(per_run_line)
+        bits.append(render_separator())
+
+    bits.append(render_kv_line("Aggregated saved", str(output_path)))
+    return Group(*bits)
 
 
 def render_final_summary(report: dict[str, Any], output_path: Path) -> Group:

@@ -3,6 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <title>HumanBench — Leaderboard v0.1</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%2016%2016%22%20shape-rendering%3D%22crispEdges%22%3E%3Crect%20width%3D%2216%22%20height%3D%2216%22%20fill%3D%22%23030a03%22/%3E%3Crect%20x%3D%221%22%20y%3D%221%22%20width%3D%2214%22%20height%3D%2214%22%20fill%3D%22none%22%20stroke%3D%22%23003a1c%22%20stroke-width%3D%221%22/%3E%3Crect%20x%3D%223%22%20y%3D%223%22%20width%3D%222%22%20height%3D%2210%22%20fill%3D%22%2300ff88%22/%3E%3Crect%20x%3D%2211%22%20y%3D%223%22%20width%3D%222%22%20height%3D%2210%22%20fill%3D%22%2300ff88%22/%3E%3Crect%20x%3D%225%22%20y%3D%227%22%20width%3D%226%22%20height%3D%222%22%20fill%3D%22%2300ff88%22/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
@@ -779,54 +780,47 @@
   .crt-scanlines {
     position: fixed;
     inset: 0;
-    z-index: 9998;
+    z-index: 9995;
     pointer-events: none;
     background: repeating-linear-gradient(
       0deg,
       transparent,
       transparent 2px,
-      rgba(0, 0, 0, 0.13) 2px,
-      rgba(0, 0, 0, 0.13) 4px
+      rgba(0, 0, 0, 0.12) 2px,
+      rgba(0, 0, 0, 0.12) 4px
     );
   }
 
-  /* Screen curvature vignette — simulates the curved tube edges */
+  /* Phosphor vignette — edge + side darkening */
   .crt-curve {
     position: fixed;
     inset: 0;
-    z-index: 9999;
+    z-index: 9996;
     pointer-events: none;
-    border-radius: 0 !important;
-    /* radial vignette darkens corners like a curved phosphor tube */
-    background: radial-gradient(
-      ellipse at center,
-      transparent 60%,
-      rgba(0, 0, 0, 0.45) 100%
-    );
+    background:
+      radial-gradient(ellipse 80% 90% at center, transparent 50%, rgba(0,0,0,0.65) 100%),
+      radial-gradient(ellipse at center, rgba(0,255,100,0.025) 0%, transparent 60%);
   }
 
-  /* Inner phosphor bloom — subtle green glow at center */
-  .crt-curve::before {
+  /* Hard rounded corners — four black circles cut the tube shape */
+  .crt-corners {
+    position: fixed;
+    inset: 0;
+    z-index: 10000;
+    pointer-events: none;
+    background:
+      radial-gradient(circle at 0%   0%,   #000 62px, transparent 63px),
+      radial-gradient(circle at 100% 0%,   #000 62px, transparent 63px),
+      radial-gradient(circle at 0%   100%, #000 62px, transparent 63px),
+      radial-gradient(circle at 100% 100%, #000 62px, transparent 63px);
+  }
+
+  /* Inner bezel rim — thin dark ring just inside the rounded corners */
+  .crt-corners::after {
     content: "";
     position: absolute;
     inset: 0;
-    background: radial-gradient(
-      ellipse at center,
-      rgba(0, 255, 100, 0.025) 0%,
-      transparent 65%
-    );
-  }
-
-  /* Screen edge curvature illusion using box-shadow on a pseudo-element */
-  .crt-curve::after {
-    content: "";
-    position: absolute;
-    inset: 0;
-    box-shadow:
-      inset 0   0   80px 20px rgba(0, 0, 0, 0.6),   /* overall edge darkening */
-      inset 0   0   20px 4px  rgba(0, 0, 0, 0.4),   /* hard inner ring */
-      inset 80px  0   40px -40px rgba(0, 0, 0, 0.35), /* left curve */
-      inset -80px 0   40px -40px rgba(0, 0, 0, 0.35); /* right curve */
+    box-shadow: inset 0 0 60px 8px rgba(0,0,0,0.55);
   }
 
   /* Horizontal roll / flicker line — VHS tape artifact */
@@ -837,22 +831,22 @@
     height: 3px;
     z-index: 9997;
     pointer-events: none;
-    background: rgba(0, 255, 120, 0.04);
-    animation: crt-roll 8s linear infinite;
+    background: rgba(0, 255, 120, 0.045);
+    animation: crt-roll 9s linear infinite;
     opacity: 0;
   }
   @keyframes crt-roll {
-    0%   { top: -4px;   opacity: 0; }
+    0%   { top: -4px;  opacity: 0; }
     2%   { opacity: 1; }
-    98%  { opacity: 0.6; }
-    100% { top: 100vh;  opacity: 0; }
+    98%  { opacity: 0.5; }
+    100% { top: 100vh; opacity: 0; }
   }
 
   /* Intermittent static burst */
   .crt-static {
     position: fixed;
     inset: 0;
-    z-index: 9996;
+    z-index: 9994;
     pointer-events: none;
     opacity: 0;
     animation: crt-static 12s steps(1, end) infinite;
@@ -864,11 +858,9 @@
   }
   @keyframes crt-static {
     0%    { opacity: 0; }
-    /* small glitch hit ~4 s in */
     33%   { opacity: 0; }
     33.5% { opacity: 1; }
     34%   { opacity: 0; }
-    /* bigger hit ~9 s in */
     75%   { opacity: 0; }
     75.3% { opacity: 0.7; }
     75.6% { opacity: 0.2; }
@@ -882,6 +874,7 @@
 <!-- CRT / VHS overlay layers -->
 <div class="crt-scanlines"></div>
 <div class="crt-curve"></div>
+<div class="crt-corners"></div>
 <div class="crt-flicker"></div>
 <div class="crt-static"></div>
 
