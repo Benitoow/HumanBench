@@ -32,3 +32,9 @@ Thumbs.db
 # Generated benchmark reports
 results/*.json
 !results/.gitkeep
+
+# wrangler files
+.wrangler
+.dev.vars*
+!.dev.vars.example
+!.env.example
