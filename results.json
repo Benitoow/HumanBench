@@ -53,5 +53,16 @@
       "ton": 26,
       "interpretation": "Good, with visible AI tics"
     }
+  },
+  {
+    "requested_model": "openai/gpt-5.4-nano",
+    "created_at": "2026-05-02T21:59:45+02:00",
+    "summary": {
+      "score_final": 56,
+      "format": 15,
+      "densite": 20,
+      "ton": 21,
+      "interpretation": "Clearly AI-styled"
+    }
   }
 ]
