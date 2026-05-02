@@ -894,6 +894,7 @@
       <span><span class="dot"></span>SYS//ONLINE</span>
       <span class="top-bar-right">
         <span class="badge">LEADERBOARD v0.1</span>
+        <button class="submit-run-btn sound-toggle" id="soundToggle" type="button" title="Toggle sound" aria-label="Toggle sound">[ ♪ ON ]</button>
         <button class="submit-run-btn" id="openSubmitHeader" type="button">[ SUBMIT A RUN ]</button>
       </span>
     </div>
@@ -1015,6 +1016,134 @@
 </div>
 
 <script>
+/* =================================================================
+   AUDIO ENGINE — synthesises CRT/VHS-style cues via Web Audio API.
+   No external files. AudioContext starts on first user interaction
+   (browser autoplay policy). Toggle persisted in localStorage.
+   ================================================================= */
+const HBSound = (function () {
+  let ctx = null;
+  let enabled = localStorage.getItem('hb-sound') !== 'off';
+
+  function ensureCtx() {
+    if (ctx) return ctx;
+    try {
+      const Ctor = window.AudioContext || window.webkitAudioContext;
+      if (!Ctor) return null;
+      ctx = new Ctor();
+    } catch (e) { return null; }
+    return ctx;
+  }
+
+  function tone({ freq = 800, duration = 0.05, volume = 0.04, type = 'square', sweep = 0 } = {}) {
+    if (!enabled) return;
+    const c = ensureCtx();
+    if (!c) return;
+    if (c.state === 'suspended') c.resume();
+    const t0 = c.currentTime;
+    const osc = c.createOscillator();
+    const gain = c.createGain();
+    osc.type = type;
+    osc.frequency.setValueAtTime(freq, t0);
+    if (sweep) osc.frequency.exponentialRampToValueAtTime(Math.max(40, freq + sweep), t0 + duration);
+    gain.gain.setValueAtTime(volume, t0);
+    gain.gain.exponentialRampToValueAtTime(0.0001, t0 + duration);
+    osc.connect(gain).connect(c.destination);
+    osc.start(t0);
+    osc.stop(t0 + duration + 0.02);
+  }
+
+  function noise({ duration = 0.12, volume = 0.05, lowpass = 1800 } = {}) {
+    if (!enabled) return;
+    const c = ensureCtx();
+    if (!c) return;
+    if (c.state === 'suspended') c.resume();
+    const t0 = c.currentTime;
+    const buf = c.createBuffer(1, Math.max(1, Math.floor(c.sampleRate * duration)), c.sampleRate);
+    const data = buf.getChannelData(0);
+    for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
+    const src = c.createBufferSource();
+    src.buffer = buf;
+    const filt = c.createBiquadFilter();
+    filt.type = 'lowpass';
+    filt.frequency.value = lowpass;
+    const gain = c.createGain();
+    gain.gain.setValueAtTime(volume, t0);
+    gain.gain.exponentialRampToValueAtTime(0.0001, t0 + duration);
+    src.connect(filt).connect(gain).connect(c.destination);
+    src.start(t0);
+    src.stop(t0 + duration + 0.02);
+  }
+
+  return {
+    hover()      { tone({ freq: 1300, duration: 0.025, volume: 0.018, type: 'square' }); },
+    click()      { tone({ freq: 220,  duration: 0.045, volume: 0.06,  type: 'square', sweep: -80 }); },
+    softClick()  { tone({ freq: 520,  duration: 0.035, volume: 0.04,  type: 'square', sweep: -120 }); },
+    open()       { noise({ duration: 0.14, volume: 0.06, lowpass: 1400 });
+                   tone({ freq: 660, duration: 0.08, volume: 0.03, type: 'sawtooth', sweep: 240 }); },
+    close()      { tone({ freq: 440, duration: 0.06, volume: 0.04, type: 'square', sweep: -200 }); },
+    confirm()    { tone({ freq: 880, duration: 0.06, volume: 0.05, type: 'square' });
+                   setTimeout(() => tone({ freq: 1320, duration: 0.08, volume: 0.05, type: 'square' }), 70); },
+    error()      { tone({ freq: 180, duration: 0.18, volume: 0.07, type: 'sawtooth', sweep: -40 }); },
+    isEnabled()  { return enabled; },
+    setEnabled(v){ enabled = !!v; localStorage.setItem('hb-sound', enabled ? 'on' : 'off'); },
+    toggle()     { this.setEnabled(!enabled); return enabled; },
+  };
+})();
+
+/* Wire global hover / click cues + the toggle button. */
+(function () {
+  const HOVER_SEL = '.submit-run-btn, .submit-cta-btn, .submit-form-btn, .modal-close, .row, .field-input, .file-drop-label';
+  const CLICK_SEL = '.submit-cta-btn, .submit-form-btn';
+
+  // throttle hover so fast cursor moves don't fire repeatedly
+  let lastHoverAt = 0;
+  document.addEventListener('mouseover', (e) => {
+    const t = e.target.closest(HOVER_SEL);
+    if (!t) return;
+    const now = performance.now();
+    if (now - lastHoverAt < 60) return;
+    lastHoverAt = now;
+    HBSound.hover();
+  });
+
+  document.addEventListener('click', (e) => {
+    const cta = e.target.closest(CLICK_SEL);
+    if (cta) { HBSound.click(); return; }
+    const small = e.target.closest('.submit-run-btn, .modal-close');
+    if (small) HBSound.softClick();
+  });
+
+  // Toggle button
+  const tog = document.getElementById('soundToggle');
+  if (tog) {
+    const refresh = () => { tog.textContent = HBSound.isEnabled() ? '[ ♪ ON ]' : '[ ♪ OFF ]'; };
+    refresh();
+    tog.addEventListener('click', () => {
+      HBSound.toggle();
+      refresh();
+      if (HBSound.isEnabled()) HBSound.softClick();
+    });
+  }
+
+  // Modal hooks (open / close / confirm / error)
+  const overlay     = document.getElementById('submitOverlay');
+  const closeBtn    = document.getElementById('modalClose');
+  const confirmBtn  = document.getElementById('confirmClose');
+  const submitForm  = document.getElementById('submitForm');
+  if (document.getElementById('openSubmitHeader')) {
+    document.getElementById('openSubmitHeader').addEventListener('click', () => HBSound.open());
+  }
+  const ctaBtn = document.querySelector('.submit-cta-btn');
+  if (ctaBtn) ctaBtn.addEventListener('click', () => HBSound.open());
+  if (closeBtn)   closeBtn.addEventListener('click', () => HBSound.close());
+  if (confirmBtn) confirmBtn.addEventListener('click', () => HBSound.close());
+  if (overlay) overlay.addEventListener('click', (e) => { if (e.target === overlay) HBSound.close(); });
+  if (submitForm) {
+    submitForm.addEventListener('submit', () => HBSound.confirm());
+  }
+})();
+
 /* =================================================================
    PIXEL FOREST — generates two SVG silhouettes (left & right edges)
    Pure pixels, no curves. Trees are rectangles + diamond canopies.
